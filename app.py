@@ -68,10 +68,10 @@ class SummaryResponse(BaseModel):
     charts: Dict[str, str]
 
 # OpenAI APIキーの設定
-os.environ["OPENAI_API_KEY"] = "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"
+# 環境変数からAPIキーを読み込む
 api_key = os.getenv("OPENAI_API_KEY")
 if not api_key:
-    raise ValueError("OPENAI_API_KEY environment variable is not set")
+    raise ValueError("OPENAI_API_KEY environment variable is not set. Please set your OpenAI API key in the .env file or environment variables.")
 
 # 設定を更新
 settings.openai_api_key = api_key
