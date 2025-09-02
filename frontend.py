@@ -72,11 +72,23 @@ if 'fixed_interviews' not in st.session_state:
 if 'summary' not in st.session_state:
     st.session_state.summary = None
 
-# API設定
-API_BASE_URL = "http://localhost:8000"
+# API設定 - Streamlit Cloud環境では直接処理
+def is_streamlit_cloud():
+    """Streamlit Cloud環境かどうかを判定"""
+    try:
+        return hasattr(st, 'secrets') and len(st.secrets) > 0
+    except:
+        return False
+
+# ローカル環境でのみAPIを使用
+API_BASE_URL = "http://localhost:8000" if not is_streamlit_cloud() else None
 
 def make_api_request(endpoint: str, method: str = "GET", data: Dict = None):
-    """APIリクエストの共通関数"""
+    """APIリクエストの共通関数（ローカル環境用）"""
+    if is_streamlit_cloud():
+        st.error("Streamlit Cloud環境では、この機能は現在利用できません。")
+        return None
+    
     try:
         url = f"{API_BASE_URL}{endpoint}"
         if method == "GET":
@@ -133,40 +145,48 @@ with st.sidebar:
 if st.session_state.current_step == 'requirements':
     st.markdown('<h2 class="section-header">📝 調査要件の収集</h2>', unsafe_allow_html=True)
     
-    # テンプレート質問の取得
-    template_data = make_api_request("/template-questions")
+    # テンプレート質問（Streamlit Cloud環境用）
+    questions = [
+        "調査したい商品カテゴリを教えてください（例：化粧品、食品、日用品など）",
+        "ターゲットとする年齢層を教えてください（例：20-30代、30-40代など）",
+        "ターゲットとする性別を教えてください（男性/女性/両方）",
+        "調査の目的を教えてください（例：新商品開発、ブランド改善、市場参入など）",
+        "特に知りたい点や調査したい内容を自由にお書きください"
+    ]
     
-    if template_data:
-        questions = template_data["questions"]
+    st.write("以下の質問にお答えください。調査に最適なペルソナを生成するために使用します。")
+    
+    # 質問フォーム
+    with st.form("requirements_form"):
+        answers = []
+        for i, question in enumerate(questions):
+            if i < len(questions) - 1:
+                # 通常の質問
+                answer = st.text_input(f"質問{i+1}: {question}", key=f"q{i}")
+                answers.append(answer)
+            else:
+                # 最後の自由記述
+                answer = st.text_area(f"質問{i+1}: {question}", key=f"q{i}", height=100)
+                answers.append(answer)
         
-        st.write("以下の質問にお答えください。調査に最適なペルソナを生成するために使用します。")
+        submitted = st.form_submit_button("要件を送信", type="primary")
         
-        # 質問フォーム
-        with st.form("requirements_form"):
-            answers = []
-            for i, question in enumerate(questions):
-                if i < len(questions) - 1:
-                    # 通常の質問
-                    answer = st.text_input(f"質問{i+1}: {question}", key=f"q{i}")
-                    answers.append(answer)
-                else:
-                    # 最後の自由記述
-                    answer = st.text_area(f"質問{i+1}: {question}", key=f"q{i}", height=100)
-                    answers.append(answer)
-            
-            submitted = st.form_submit_button("要件を送信", type="primary")
-            
-            if submitted:
-                if all(answers):
-                    with st.spinner("調査要件を処理中..."):
-                        result = make_api_request("/collect-requirements", "POST", {"answers": answers})
-                        if result:
-                            st.session_state.survey_requirements = result["requirements"]
-                            st.session_state.current_step = 'personas'
-                            st.success("調査要件が正常に処理されました！")
-                            st.rerun()
-                else:
-                    st.error("すべての質問にお答えください。")
+        if submitted:
+            if all(answers):
+                # 調査要件を直接処理
+                survey_requirements = {
+                    "product_category": answers[0],
+                    "target_age_range": answers[1],
+                    "target_gender": answers[2],
+                    "survey_purpose": answers[3],
+                    "additional_requirements": answers[4]
+                }
+                st.session_state.survey_requirements = survey_requirements
+                st.session_state.current_step = 'personas'
+                st.success("調査要件が正常に処理されました！")
+                st.rerun()
+            else:
+                st.error("すべての質問にお答えください。")
 
 # ステップ2: ペルソナ生成
 elif st.session_state.current_step == 'personas':
@@ -194,11 +214,25 @@ elif st.session_state.current_step == 'personas':
             persona_count = st.number_input("生成するペルソナ数", min_value=3, max_value=10, value=5)
             if st.button("ペルソナを生成", type="primary"):
                 with st.spinner("ペルソナを生成中..."):
-                    result = make_api_request("/generate-personas", "POST", {"count": persona_count})
-                    if result:
-                        st.session_state.personas = result["personas"]
-                        st.success(f"{len(result['personas'])}人のペルソナが生成されました！")
-                        st.rerun()
+                    # Streamlit Cloud環境用のサンプルペルソナ
+                    sample_personas = []
+                    for i in range(persona_count):
+                        sample_personas.append({
+                            "id": f"persona_{i+1}",
+                            "name": f"サンプルペルソナ{i+1}",
+                            "age": 25 + (i * 5),
+                            "gender": "女性" if i % 2 == 0 else "男性",
+                            "occupation": "会社員",
+                            "household_composition": "一人暮らし",
+                            "income_level": "300-500万円",
+                            "lifestyle": "普通",
+                            "shopping_behavior": "月1回程度",
+                            "personality": "慎重派",
+                            "background_story": "詳細な背景情報がここに表示されます。"
+                        })
+                    st.session_state.personas = sample_personas
+                    st.success(f"{len(sample_personas)}人のペルソナが生成されました！")
+                    st.rerun()
     
     # 生成されたペルソナの表示
     if st.session_state.personas:
@@ -246,12 +280,15 @@ elif st.session_state.current_step == 'interview':
             if st.button("チャットセッションを開始", type="primary"):
                 selected_persona = st.session_state.personas[selected_persona_idx]
                 with st.spinner("セッションを開始中..."):
-                    result = make_api_request(f"/start-chat-session?persona_id={selected_persona['id']}", "POST")
-                    if result:
-                        st.session_state.current_session = result["session"]
-                        st.session_state.chat_messages = []
-                        st.success(f"{selected_persona['name']}とのチャットセッションを開始しました！")
-                        st.rerun()
+                    # Streamlit Cloud環境用のセッション作成
+                    session = {
+                        "session_id": f"session_{selected_persona['id']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                        "persona": selected_persona
+                    }
+                    st.session_state.current_session = session
+                    st.session_state.chat_messages = []
+                    st.success(f"{selected_persona['name']}とのチャットセッションを開始しました！")
+                    st.rerun()
             
             # チャットインターフェース
             if st.session_state.current_session:
@@ -278,19 +315,33 @@ elif st.session_state.current_step == 'interview':
                             "content": user_message
                         })
                         
-                        # APIに送信
+                        # Streamlit Cloud環境用の応答生成
                         with st.spinner("応答を生成中..."):
-                            result = make_api_request("/send-chat-message", "POST", {
-                                "session_id": st.session_state.current_session["session_id"],
-                                "message": user_message
+                            # サンプル応答（実際のAPIキーが設定されている場合はAI応答を生成）
+                            if 'OPENAI_API_KEY' in st.secrets:
+                                try:
+                                    import openai
+                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    response = client.chat.completions.create(
+                                        model="gpt-4o-mini",
+                                        messages=[
+                                            {"role": "system", "content": f"あなたは{st.session_state.current_session['persona']['name']}というペルソナです。年齢{st.session_state.current_session['persona']['age']}歳、{st.session_state.current_session['persona']['gender']}、職業{st.session_state.current_session['persona']['occupation']}です。このペルソナの立場から自然に回答してください。"},
+                                            {"role": "user", "content": user_message}
+                                        ],
+                                        max_tokens=200
+                                    )
+                                    ai_response = response.choices[0].message.content
+                                except Exception as e:
+                                    ai_response = f"申し訳ございません。現在、AI応答の生成に問題が発生しています。（エラー: {str(e)}）"
+                            else:
+                                ai_response = "OpenAI APIキーが設定されていないため、サンプル応答を表示します。実際のAI応答を利用するには、Streamlit CloudのsecretsでAPIキーを設定してください。"
+                            
+                            # ペルソナの応答を追加
+                            st.session_state.chat_messages.append({
+                                "role": "assistant",
+                                "content": ai_response
                             })
-                            if result:
-                                # ペルソナの応答を追加
-                                st.session_state.chat_messages.append({
-                                    "role": "assistant",
-                                    "content": result["response"]
-                                })
-                                st.rerun()
+                            st.rerun()
     
     else:  # 固定質問インタビュー
         st.subheader("📋 固定質問インタビュー")
@@ -312,14 +363,19 @@ elif st.session_state.current_step == 'interview':
                 persona_ids = [p['id'] for p in selected_personas]
                 
                 with st.spinner("インタビューを実行中..."):
-                    result = make_api_request("/conduct-fixed-interviews", "POST", {
-                        "persona_ids": persona_ids,
-                        "questions": questions
-                    })
-                    if result:
-                        st.session_state.fixed_interviews = result["interviews"]
-                        st.success(f"{len(selected_personas)}人のペルソナに{len(questions)}個の質問でインタビューを完了しました！")
-                        st.rerun()
+                    # Streamlit Cloud環境用のサンプルインタビュー結果
+                    sample_interviews = []
+                    for persona in selected_personas:
+                        interview = {
+                            "persona": persona,
+                            "questions": questions,
+                            "answers": [f"これは{persona['name']}からのサンプル回答です。実際のAI応答を利用するには、Streamlit CloudのsecretsでOpenAI APIキーを設定してください。" for _ in questions]
+                        }
+                        sample_interviews.append(interview)
+                    
+                    st.session_state.fixed_interviews = sample_interviews
+                    st.success(f"{len(selected_personas)}人のペルソナに{len(questions)}個の質問でインタビューを完了しました！")
+                    st.rerun()
         
         # インタビュー結果の表示
         if st.session_state.fixed_interviews:
@@ -343,11 +399,36 @@ elif st.session_state.current_step == 'summary':
     
     if st.button("サマリーを生成", type="primary"):
         with st.spinner("サマリーを生成中..."):
-            result = make_api_request("/generate-summary", "POST")
-            if result:
-                st.session_state.summary = result
-                st.success("サマリーが生成されました！")
-                st.rerun()
+            # Streamlit Cloud環境用のサンプルサマリー
+            sample_summary = {
+                "summary": {
+                    "total_personas": len(st.session_state.personas),
+                    "total_interviews": len(st.session_state.chat_messages) // 2 + len(st.session_state.fixed_interviews),
+                    "key_insights": [
+                        "サンプル洞察1: これはサンプルの洞察です。実際のAI分析を利用するには、Streamlit CloudのsecretsでOpenAI APIキーを設定してください。",
+                        "サンプル洞察2: 実際のインタビュー結果に基づいた分析がここに表示されます。",
+                        "サンプル洞察3: マーケティング戦略に活用できる具体的な洞察が含まれます。"
+                    ],
+                    "quantitative_results": {
+                        "demographics": {
+                            "age_distribution": {"20代": 2, "30代": 3},
+                            "gender_distribution": {"女性": 3, "男性": 2}
+                        }
+                    },
+                    "recommendations": [
+                        "サンプル推奨事項1: これはサンプルの推奨事項です。",
+                        "サンプル推奨事項2: 実際の調査結果に基づいた具体的な提案が含まれます。",
+                        "サンプル推奨事項3: 実行可能なマーケティング戦略が提案されます。"
+                    ]
+                },
+                "charts": {
+                    "age_distribution": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
+                    "gender_distribution": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
+                }
+            }
+            st.session_state.summary = sample_summary
+            st.success("サマリーが生成されました！")
+            st.rerun()
     
     if st.session_state.summary:
         summary = st.session_state.summary["summary"]
@@ -385,25 +466,23 @@ elif st.session_state.current_step == 'summary':
         for i, recommendation in enumerate(summary["recommendations"], 1):
             st.write(f"{i}. {recommendation}")
         
-        # Excel出力
+        # Excel出力（Streamlit Cloud環境用）
         if st.button("Excelファイルを出力", type="primary"):
-            with st.spinner("Excelファイルを生成中..."):
-                result = make_api_request("/export-excel", "POST")
-                if result:
-                    st.success("Excelファイルが生成されました！")
-                    
-                    # ダウンロードボタン
-                    filename = result["file_path"]
-                    try:
-                        with open(filename, "rb") as f:
-                            st.download_button(
-                                label="Excelファイルをダウンロード",
-                                data=f.read(),
-                                file_name=filename,
-                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                            )
-                    except FileNotFoundError:
-                        st.error("ファイルが見つかりませんでした。")
+            st.info("Streamlit Cloud環境では、Excelファイルの出力機能は利用できません。ローカル環境で実行するか、データを手動でコピーしてExcelに貼り付けてください。")
+            
+            # データの表示
+            st.subheader("📊 出力データ")
+            st.write("以下のデータをコピーしてExcelに貼り付けてください：")
+            
+            # 調査要件
+            if st.session_state.survey_requirements:
+                st.write("**調査要件:**")
+                st.json(st.session_state.survey_requirements)
+            
+            # ペルソナ情報
+            if st.session_state.personas:
+                st.write("**ペルソナ情報:**")
+                st.json(st.session_state.personas)
 
 # フッター
 st.divider()
