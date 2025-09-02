@@ -24,15 +24,32 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# .envファイルから環境変数を読み込む
-load_dotenv()
+# 環境変数の読み込み（ローカル開発用とStreamlit Cloud用の両方に対応）
+try:
+    load_dotenv()
+except:
+    pass  # .envファイルが存在しない場合は無視
 
 # 設定クラス
 class Settings(BaseModel):
-    openai_api_key: str = Field(default=os.getenv("OPENAI_API_KEY"))
+    openai_api_key: str = Field(default="")
     max_iterations: int = 2
     default_k: int = 10
     temperature: float = 0.7
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Streamlit CloudのsecretsからAPIキーを取得
+        try:
+            import streamlit as st
+            if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+                self.openai_api_key = st.secrets['OPENAI_API_KEY']
+        except:
+            pass
+        
+        # 環境変数からも取得を試行
+        if not self.openai_api_key:
+            self.openai_api_key = os.getenv("OPENAI_API_KEY", "")
 
 settings = Settings()
 

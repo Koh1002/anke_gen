@@ -97,6 +97,17 @@ st.markdown('<h1 class="main-header">🎭 仮想インタビューシステム</
 with st.sidebar:
     st.header("📋 ナビゲーション")
     
+    # APIキーの設定状況を表示
+    st.subheader("🔑 API設定状況")
+    try:
+        if 'OPENAI_API_KEY' in st.secrets:
+            st.success("✅ OpenAI APIキーが設定されています")
+        else:
+            st.warning("⚠️ OpenAI APIキーが設定されていません")
+            st.info("Streamlit Cloudのsecretsで設定してください")
+    except:
+        st.info("ℹ️ ローカル環境で実行中")
+    
     # ステップ表示
     steps = [
         ("requirements", "1. 調査要件の収集"),

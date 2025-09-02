@@ -42,7 +42,9 @@ CPGメーカー向けの仮想インタビューシステムです。調査会�
 - Python 3.8以上
 - OpenAI API キー
 
-### インストール
+### 方法1: ローカル開発環境
+
+#### インストール
 
 1. リポジトリのクローン
 ```bash
@@ -61,7 +63,7 @@ pip install -r requirements.txt
 echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
 ```
 
-### 起動方法
+#### 起動方法
 
 1. バックエンドサーバーの起動
 ```bash
@@ -77,6 +79,32 @@ streamlit run frontend.py
 ```
 http://localhost:8501
 ```
+
+### 方法2: Streamlit Cloudでのデプロイ
+
+#### 1. GitHubリポジトリの準備
+- このリポジトリをGitHubにプッシュ
+- `.env`ファイルは`.gitignore`で除外済み
+
+#### 2. Streamlit Cloudでの設定
+1. [Streamlit Cloud](https://streamlit.io/cloud)にアクセス
+2. GitHubアカウントでログイン
+3. 「New app」をクリック
+4. リポジトリを選択: `Koh1002/anke_gen`
+5. メインファイル: `frontend.py`
+6. デプロイ
+
+#### 3. 環境変数の設定
+1. Streamlit Cloudのダッシュボードでアプリを選択
+2. 「Settings」→「Secrets」をクリック
+3. 以下の内容を追加:
+```toml
+OPENAI_API_KEY = "your_openai_api_key_here"
+```
+
+#### 4. アプリの起動
+- 設定完了後、アプリが自動的に起動
+- サイドバーでAPIキーの設定状況を確認可能
 
 ## 📋 使用方法
 
