@@ -1,11 +1,5 @@
 import streamlit as st
-import requests
-import pandas as pd
-import json
-import base64
 from typing import Dict, Any, List
-import plotly.express as px
-import plotly.graph_objects as go
 from datetime import datetime
 
 # ページ設定
@@ -76,7 +70,10 @@ if 'summary' not in st.session_state:
 def is_streamlit_cloud():
     """Streamlit Cloud環境かどうかを判定"""
     try:
-        return hasattr(st, 'secrets') and len(st.secrets) > 0
+        # Streamlit Cloud環境の判定を改善
+        return (hasattr(st, 'secrets') and 
+                hasattr(st.secrets, '_secrets') and 
+                len(st.secrets._secrets) > 0)
     except:
         return False
 
@@ -90,6 +87,8 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict = None):
         return None
     
     try:
+        # ローカル環境でのみrequestsを使用
+        import requests
         url = f"{API_BASE_URL}{endpoint}"
         if method == "GET":
             response = requests.get(url)
@@ -98,7 +97,10 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict = None):
         
         response.raise_for_status()
         return response.json()
-    except requests.exceptions.RequestException as e:
+    except ImportError:
+        st.error("requestsライブラリが利用できません。ローカル環境で実行してください。")
+        return None
+    except Exception as e:
         st.error(f"APIエラー: {str(e)}")
         return None
 
