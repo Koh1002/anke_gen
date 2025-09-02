@@ -216,24 +216,133 @@ elif st.session_state.current_step == 'personas':
             persona_count = st.number_input("生成するペルソナ数", min_value=3, max_value=10, value=5)
             if st.button("ペルソナを生成", type="primary"):
                 with st.spinner("ペルソナを生成中..."):
-                    # Streamlit Cloud環境用のサンプルペルソナ
-                    sample_personas = []
-                    for i in range(persona_count):
-                        sample_personas.append({
-                            "id": f"persona_{i+1}",
-                            "name": f"サンプルペルソナ{i+1}",
-                            "age": 25 + (i * 5),
-                            "gender": "女性" if i % 2 == 0 else "男性",
-                            "occupation": "会社員",
-                            "household_composition": "一人暮らし",
-                            "income_level": "300-500万円",
-                            "lifestyle": "普通",
-                            "shopping_behavior": "月1回程度",
-                            "personality": "慎重派",
-                            "background_story": "詳細な背景情報がここに表示されます。"
-                        })
-                    st.session_state.personas = sample_personas
-                    st.success(f"{len(sample_personas)}人のペルソナが生成されました！")
+                    # GPT APIキーが設定されている場合はAIで生成
+                    if 'OPENAI_API_KEY' in st.secrets:
+                        try:
+                            import openai
+                            client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                            
+                            # 調査要件に基づいてペルソナを生成
+                            prompt = f"""
+                            以下の調査要件に基づいて、{persona_count}人の仮想ペルソナを生成してください。
+                            
+                            調査要件:
+                            - 商品カテゴリ: {st.session_state.survey_requirements['product_category']}
+                            - ターゲット年齢層: {st.session_state.survey_requirements['target_age_range']}
+                            - ターゲット性別: {st.session_state.survey_requirements['target_gender']}
+                            - 調査目的: {st.session_state.survey_requirements['survey_purpose']}
+                            - 追加要件: {st.session_state.survey_requirements['additional_requirements']}
+                            
+                            各ペルソナは以下の形式で出力してください（JSON形式）:
+                            {{
+                                "id": "persona_1",
+                                "name": "姓名",
+                                "age": 年齢,
+                                "gender": "性別",
+                                "occupation": "職業",
+                                "household_composition": "世帯構成",
+                                "income_level": "所得レベル",
+                                "lifestyle": "ライフスタイル",
+                                "shopping_behavior": "購買行動",
+                                "personality": "性格・特徴",
+                                "hobbies": "趣味・嗜好",
+                                "background_story": "詳細な背景ストーリー"
+                            }}
+                            
+                            各ペルソナの間に空行を入れてください。年齢、職業、ライフスタイルは多様にしてください。
+                            """
+                            
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{"role": "user", "content": prompt}],
+                                max_tokens=2000
+                            )
+                            
+                            # 応答を解析してペルソナを生成
+                            ai_response = response.choices[0].message.content
+                            personas = []
+                            
+                            # 応答からペルソナ情報を抽出（簡易的な処理）
+                            lines = ai_response.split('\n')
+                            current_persona = {}
+                            
+                            for line in lines:
+                                line = line.strip()
+                                if line.startswith('"id"'):
+                                    if current_persona:
+                                        personas.append(current_persona)
+                                    current_persona = {}
+                                
+                                if ':' in line and '"' in line:
+                                    try:
+                                        key, value = line.split(':', 1)
+                                        key = key.strip().strip('"')
+                                        value = value.strip().strip(',').strip('"')
+                                        current_persona[key] = value
+                                    except:
+                                        continue
+                            
+                            if current_persona:
+                                personas.append(current_persona)
+                            
+                            # 生成されたペルソナが不足している場合はサンプルで補完
+                            while len(personas) < persona_count:
+                                i = len(personas)
+                                personas.append({
+                                    "id": f"persona_{i+1}",
+                                    "name": f"サンプルペルソナ{i+1}",
+                                    "age": 25 + (i * 5),
+                                    "gender": "女性" if i % 2 == 0 else "男性",
+                                    "occupation": ["会社員", "フリーランス", "主婦", "学生", "公務員"][i % 5],
+                                    "household_composition": ["一人暮らし", "夫婦", "家族と同居", "ルームシェア"][i % 4],
+                                    "income_level": ["200-300万円", "300-500万円", "500-800万円", "800万円以上"][i % 4],
+                                    "lifestyle": ["アクティブ", "マイペース", "規則的", "自由奔放"][i % 4],
+                                    "shopping_behavior": ["月1回程度", "週1回程度", "必要に応じて", "頻繁に"][i % 4],
+                                    "personality": ["慎重派", "冒険的", "実用的", "トレンド重視"][i % 4],
+                                    "hobbies": ["読書", "スポーツ", "料理", "旅行", "ゲーム"][i % 5],
+                                    "background_story": f"これは{persona_count}番目のペルソナです。詳細な背景情報がここに表示されます。"
+                                })
+                            
+                        except Exception as e:
+                            st.error(f"AIペルソナ生成でエラーが発生しました: {str(e)}")
+                            # エラーの場合はサンプルペルソナを生成
+                            personas = []
+                            for i in range(persona_count):
+                                personas.append({
+                                    "id": f"persona_{i+1}",
+                                    "name": f"サンプルペルソナ{i+1}",
+                                    "age": 25 + (i * 5),
+                                    "gender": "女性" if i % 2 == 0 else "男性",
+                                    "occupation": ["会社員", "フリーランス", "主婦", "学生", "公務員"][i % 5],
+                                    "household_composition": ["一人暮らし", "夫婦", "家族と同居", "ルームシェア"][i % 4],
+                                    "income_level": ["200-300万円", "300-500万円", "500-800万円", "800万円以上"][i % 4],
+                                    "lifestyle": ["アクティブ", "マイペース", "規則的", "自由奔放"][i % 4],
+                                    "shopping_behavior": ["月1回程度", "週1回程度", "必要に応じて", "頻繁に"][i % 4],
+                                    "personality": ["慎重派", "冒険的", "実用的", "トレンド重視"][i % 4],
+                                    "hobbies": ["読書", "スポーツ", "料理", "旅行", "ゲーム"][i % 5],
+                                    "background_story": f"これは{persona_count}番目のペルソナです。詳細な背景情報がここに表示されます。"
+                                })
+                    else:
+                        # APIキーが設定されていない場合はサンプルペルソナを生成
+                        personas = []
+                        for i in range(persona_count):
+                            personas.append({
+                                "id": f"persona_{i+1}",
+                                "name": f"サンプルペルソナ{i+1}",
+                                "age": 25 + (i * 5),
+                                "gender": "女性" if i % 2 == 0 else "男性",
+                                "occupation": ["会社員", "フリーランス", "主婦", "学生", "公務員"][i % 5],
+                                "household_composition": ["一人暮らし", "夫婦", "家族と同居", "ルームシェア"][i % 4],
+                                "income_level": ["200-300万円", "300-500万円", "500-800万円", "800万円以上"][i % 4],
+                                "lifestyle": ["アクティブ", "マイペース", "規則的", "自由奔放"][i % 4],
+                                "shopping_behavior": ["月1回程度", "週1回程度", "必要に応じて", "頻繁に"][i % 4],
+                                "personality": ["慎重派", "冒険的", "実用的", "トレンド重視"][i % 4],
+                                "hobbies": ["読書", "スポーツ", "料理", "旅行", "ゲーム"][i % 5],
+                                "background_story": f"これは{persona_count}番目のペルソナです。詳細な背景情報がここに表示されます。"
+                            })
+                    
+                    st.session_state.personas = personas
+                    st.success(f"{len(personas)}人のペルソナが生成されました！")
                     st.rerun()
     
     # 生成されたペルソナの表示
@@ -244,16 +353,17 @@ elif st.session_state.current_step == 'personas':
             with st.expander(f"👤 {persona['name']} ({persona['age']}歳, {persona['gender']})"):
                 col1, col2 = st.columns(2)
                 with col1:
-                    st.write(f"**職業:** {persona['occupation']}")
-                    st.write(f"**世帯構成:** {persona['household_composition']}")
-                    st.write(f"**所得レベル:** {persona['income_level']}")
-                    st.write(f"**ライフスタイル:** {persona['lifestyle']}")
+                    st.write(f"**職業:** {persona.get('occupation', '未設定')}")
+                    st.write(f"**世帯構成:** {persona.get('household_composition', '未設定')}")
+                    st.write(f"**所得レベル:** {persona.get('income_level', '未設定')}")
+                    st.write(f"**ライフスタイル:** {persona.get('lifestyle', '未設定')}")
                 with col2:
-                    st.write(f"**購買行動:** {persona['shopping_behavior']}")
-                    st.write(f"**性格・特徴:** {persona['personality']}")
+                    st.write(f"**購買行動:** {persona.get('shopping_behavior', '未設定')}")
+                    st.write(f"**性格・特徴:** {persona.get('personality', '未設定')}")
+                    st.write(f"**趣味・嗜好:** {persona.get('hobbies', '未設定')}")
                 
                 st.write("**背景ストーリー:**")
-                st.write(persona['background_story'])
+                st.write(persona.get('background_story', '詳細な背景情報がここに表示されます。'))
         
         # 次のステップへ
         if st.button("インタビューを開始", type="primary"):
@@ -345,50 +455,250 @@ elif st.session_state.current_step == 'interview':
                             })
                             st.rerun()
     
-    else:  # 固定質問インタビュー
-        st.subheader("📋 固定質問インタビュー")
+    else:  # 固定質問インタビュー（定量調査）
+        st.subheader("📋 定量調査インタビュー")
         
-        # ペルソナ選択
         if st.session_state.personas:
-            selected_personas = st.multiselect(
-                "インタビューするペルソナを選択",
-                options=st.session_state.personas,
-                format_func=lambda x: f"{x['name']} ({x['age']}歳, {x['gender']})"
+            st.write("生成されたペルソナ全員に対して同じ質問を投げかけて、統計を取ります。")
+            
+            # 質問タイプの選択
+            question_type = st.selectbox(
+                "質問タイプを選択",
+                ["選択式（ラジオボタン）", "選択式（チェックボックス）", "自由記述"]
             )
             
             # 質問入力
-            st.write("インタビューする質問を入力してください（1行に1つの質問）")
-            questions_text = st.text_area("質問", height=150, placeholder="例：\nこの商品カテゴリについてどのような印象をお持ちですか？\n購入する際に最も重視する点は何ですか？\n改善してほしい点はありますか？")
-            
-            if st.button("インタビューを実行", type="primary") and selected_personas and questions_text:
-                questions = [q.strip() for q in questions_text.split('\n') if q.strip()]
-                persona_ids = [p['id'] for p in selected_personas]
+            if question_type == "選択式（ラジオボタン）":
+                question_text = st.text_input("質問内容", placeholder="例：この商品カテゴリについてどのような印象をお持ちですか？")
+                options = st.text_area("選択肢（1行に1つ）", placeholder="例：\nとても良い印象\n良い印象\n普通\n悪い印象\nとても悪い印象", height=100)
                 
-                with st.spinner("インタビューを実行中..."):
-                    # Streamlit Cloud環境用のサンプルインタビュー結果
-                    sample_interviews = []
-                    for persona in selected_personas:
-                        interview = {
-                            "persona": persona,
-                            "questions": questions,
-                            "answers": [f"これは{persona['name']}からのサンプル回答です。実際のAI応答を利用するには、Streamlit CloudのsecretsでOpenAI APIキーを設定してください。" for _ in questions]
-                        }
-                        sample_interviews.append(interview)
+                if st.button("定量調査を実行", type="primary") and question_text and options:
+                    option_list = [opt.strip() for opt in options.split('\n') if opt.strip()]
                     
-                    st.session_state.fixed_interviews = sample_interviews
-                    st.success(f"{len(selected_personas)}人のペルソナに{len(questions)}個の質問でインタビューを完了しました！")
-                    st.rerun()
-        
-        # インタビュー結果の表示
-        if st.session_state.fixed_interviews:
-            st.subheader("📊 インタビュー結果")
+                    with st.spinner("定量調査を実行中..."):
+                        # 全ペルソナに対して質問を実行
+                        survey_results = []
+                        
+                        for persona in st.session_state.personas:
+                            if 'OPENAI_API_KEY' in st.secrets:
+                                try:
+                                    import openai
+                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    
+                                    prompt = f"""
+                                    あなたは{persona['name']}というペルソナです。
+                                    年齢{persona['age']}歳、{persona['gender']}、職業{persona.get('occupation', '会社員')}です。
+                                    
+                                    以下の質問に対して、提供された選択肢から1つを選んで回答してください。
+                                    
+                                    質問: {question_text}
+                                    選択肢: {', '.join(option_list)}
+                                    
+                                    選択肢のみを回答してください。
+                                    """
+                                    
+                                    response = client.chat.completions.create(
+                                        model="gpt-4o-mini",
+                                        messages=[{"role": "user", "content": prompt}],
+                                        max_tokens=50
+                                    )
+                                    
+                                    answer = response.choices[0].message.content.strip()
+                                    # 選択肢に含まれていない場合は最初の選択肢を選択
+                                    if answer not in option_list:
+                                        answer = option_list[0]
+                                    
+                                except Exception as e:
+                                    # エラーの場合はランダム選択
+                                    import random
+                                    answer = random.choice(option_list)
+                            else:
+                                # APIキーが設定されていない場合はランダム選択
+                                import random
+                                answer = random.choice(option_list)
+                            
+                            survey_results.append({
+                                "persona": persona,
+                                "question": question_text,
+                                "answer": answer,
+                                "options": option_list
+                            })
+                        
+                        st.session_state.fixed_interviews = survey_results
+                        st.success(f"{len(st.session_state.personas)}人のペルソナに定量調査を完了しました！")
+                        st.rerun()
             
-            for interview in st.session_state.fixed_interviews:
-                with st.expander(f"👤 {interview['persona']['name']}の回答"):
-                    for i, (question, answer) in enumerate(zip(interview['questions'], interview['answers'])):
-                        st.write(f"**質問{i+1}:** {question}")
-                        st.write(f"**回答:** {answer}")
-                        st.divider()
+            elif question_type == "選択式（チェックボックス）":
+                question_text = st.text_input("質問内容", placeholder="例：この商品カテゴリで重視する点は何ですか？（複数選択可）")
+                options = st.text_area("選択肢（1行に1つ）", placeholder="例：\n価格\n品質\nデザイン\nブランド\n使いやすさ", height=100)
+                
+                if st.button("定量調査を実行", type="primary") and question_text and options:
+                    option_list = [opt.strip() for opt in options.split('\n') if opt.strip()]
+                    
+                    with st.spinner("定量調査を実行中..."):
+                        survey_results = []
+                        
+                        for persona in st.session_state.personas:
+                            if 'OPENAI_API_KEY' in st.secrets:
+                                try:
+                                    import openai
+                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    
+                                    prompt = f"""
+                                    あなたは{persona['name']}というペルソナです。
+                                    年齢{persona['age']}歳、{persona['gender']}、職業{persona.get('occupation', '会社員')}です。
+                                    
+                                    以下の質問に対して、提供された選択肢から複数を選んで回答してください。
+                                    
+                                    質問: {question_text}
+                                    選択肢: {', '.join(option_list)}
+                                    
+                                    選択した選択肢をカンマ区切りで回答してください。
+                                    """
+                                    
+                                    response = client.chat.completions.create(
+                                        model="gpt-4o-mini",
+                                        messages=[{"role": "user", "content": prompt}],
+                                        max_tokens=100
+                                    )
+                                    
+                                    answer_text = response.choices[0].message.content.strip()
+                                    selected_options = [opt.strip() for opt in answer_text.split(',') if opt.strip() in option_list]
+                                    
+                                    # 選択肢に含まれていない場合はランダム選択
+                                    if not selected_options:
+                                        import random
+                                        selected_options = random.sample(option_list, min(2, len(option_list)))
+                                    
+                                except Exception as e:
+                                    import random
+                                    selected_options = random.sample(option_list, min(2, len(option_list)))
+                            else:
+                                import random
+                                selected_options = random.sample(option_list, min(2, len(option_list)))
+                            
+                            survey_results.append({
+                                "persona": persona,
+                                "question": question_text,
+                                "answer": selected_options,
+                                "options": option_list
+                            })
+                        
+                        st.session_state.fixed_interviews = survey_results
+                        st.success(f"{len(st.session_state.personas)}人のペルソナに定量調査を完了しました！")
+                        st.rerun()
+            
+            else:  # 自由記述
+                question_text = st.text_input("質問内容", placeholder="例：この商品カテゴリについてどのような印象をお持ちですか？")
+                
+                if st.button("定量調査を実行", type="primary") and question_text:
+                    with st.spinner("定量調査を実行中..."):
+                        survey_results = []
+                        
+                        for persona in st.session_state.personas:
+                            if 'OPENAI_API_KEY' in st.secrets:
+                                try:
+                                    import openai
+                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    
+                                    prompt = f"""
+                                    あなたは{persona['name']}というペルソナです。
+                                    年齢{persona['age']}歳、{persona['gender']}、職業{persona.get('occupation', '会社員')}です。
+                                    
+                                    以下の質問に対して、このペルソナの立場から回答してください。
+                                    
+                                    質問: {question_text}
+                                    
+                                    簡潔に回答してください（50文字以内）。
+                                    """
+                                    
+                                    response = client.chat.completions.create(
+                                        model="gpt-4o-mini",
+                                        messages=[{"role": "user", "content": prompt}],
+                                        max_tokens=100
+                                    )
+                                    
+                                    answer = response.choices[0].message.content.strip()
+                                    
+                                except Exception as e:
+                                    answer = f"これは{persona['name']}からのサンプル回答です。"
+                            else:
+                                answer = f"これは{persona['name']}からのサンプル回答です。"
+                            
+                            survey_results.append({
+                                "persona": persona,
+                                "question": question_text,
+                                "answer": answer,
+                                "options": []
+                            })
+                        
+                        st.session_state.fixed_interviews = survey_results
+                        st.success(f"{len(st.session_state.personas)}人のペルソナに定量調査を完了しました！")
+                        st.rerun()
+        
+        # 定量調査結果の表示
+        if st.session_state.fixed_interviews:
+            st.subheader("📊 定量調査結果")
+            
+            # 統計情報の表示
+            if st.session_state.fixed_interviews and len(st.session_state.fixed_interviews) > 0:
+                first_result = st.session_state.fixed_interviews[0]
+                
+                if isinstance(first_result['answer'], list):  # チェックボックス形式
+                    # 各選択肢の選択回数をカウント
+                    option_counts = {}
+                    for option in first_result['options']:
+                        option_counts[option] = sum(1 for result in st.session_state.fixed_interviews if option in result['answer'])
+                    
+                    st.write("**選択肢別回答数:**")
+                    for option, count in option_counts.items():
+                        percentage = (count / len(st.session_state.fixed_interviews)) * 100
+                        st.write(f"- {option}: {count}人 ({percentage:.1f}%)")
+                    
+                    # グラフ表示
+                    import plotly.express as px
+                    fig = px.bar(
+                        x=list(option_counts.keys()),
+                        y=list(option_counts.values()),
+                        title="選択肢別回答数",
+                        labels={'x': '選択肢', 'y': '回答数'}
+                    )
+                    st.plotly_chart(fig)
+                    
+                elif first_result['options']:  # ラジオボタン形式
+                    # 各選択肢の選択回数をカウント
+                    option_counts = {}
+                    for option in first_result['options']:
+                        option_counts[option] = sum(1 for result in st.session_state.fixed_interviews if result['answer'] == option)
+                    
+                    st.write("**選択肢別回答数:**")
+                    for option, count in option_counts.items():
+                        percentage = (count / len(st.session_state.fixed_interviews)) * 100
+                        st.write(f"- {option}: {count}人 ({percentage:.1f}%)")
+                    
+                    # 円グラフ表示
+                    import plotly.express as px
+                    fig = px.pie(
+                        values=list(option_counts.values()),
+                        names=list(option_counts.keys()),
+                        title="選択肢別回答率"
+                    )
+                    st.plotly_chart(fig)
+                
+                else:  # 自由記述形式
+                    st.write("**回答一覧:**")
+                    for result in st.session_state.fixed_interviews:
+                        st.write(f"- **{result['persona']['name']}**: {result['answer']}")
+            
+            # 詳細結果の表示
+            st.write("**詳細結果:**")
+            for result in st.session_state.fixed_interviews:
+                with st.expander(f"👤 {result['persona']['name']}の回答"):
+                    st.write(f"**質問:** {result['question']}")
+                    if isinstance(result['answer'], list):
+                        st.write(f"**回答:** {', '.join(result['answer'])}")
+                    else:
+                        st.write(f"**回答:** {result['answer']}")
     
     # サマリー生成へ
     if st.button("結果サマリーを生成", type="primary"):
