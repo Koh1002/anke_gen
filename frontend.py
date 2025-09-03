@@ -5,7 +5,7 @@ import plotly.express as px
 
 # ページ設定
 st.set_page_config(
-    page_title="仮想インタビューシステム",
+    page_title="QuickProbe - 仮想インタビューシステム",
     page_icon="🎭",
     layout="wide",
     initial_sidebar_state="expanded"
@@ -19,6 +19,34 @@ st.markdown("""
         font-weight: bold;
         color: #1f77b4;
         text-align: center;
+        margin-bottom: 2rem;
+    }
+    .brand-header {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 1rem;
+        margin-bottom: 2rem;
+    }
+    .brand-logo {
+        width: 80px;
+        height: 80px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    .brand-text {
+        font-size: 3rem;
+        font-weight: bold;
+        background: linear-gradient(135deg, #1f77b4, #ff7f0e);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    .tagline {
+        font-size: 1.2rem;
+        color: #666;
+        text-align: center;
+        margin-top: -1rem;
         margin-bottom: 2rem;
     }
     .section-header {
@@ -47,6 +75,13 @@ st.markdown("""
     .assistant-message {
         background-color: #f3e5f5;
         margin-right: 2rem;
+    }
+    .sidebar-logo {
+        width: 60px;
+        height: 60px;
+        border-radius: 8px;
+        margin: 0 auto;
+        display: block;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -136,11 +171,26 @@ def make_api_request(endpoint: str, method: str = "GET", data: Dict = None):
         st.error(f"APIエラー: {str(e)}")
         return None
 
-# メインタイトル
-st.markdown('<h1 class="main-header">🎭 仮想インタビューシステム</h1>', unsafe_allow_html=True)
+# メインタイトル - QuickProbeブランディング
+st.markdown("""
+    <div class="brand-header">
+        <div>
+            <div class="brand-text">QuickProbe</div>
+        </div>
+    </div>
+    <div class="tagline">🎭 仮想インタビューシステム - マーケティング調査の未来</div>
+""", unsafe_allow_html=True)
 
 # サイドバー - ナビゲーション
 with st.sidebar:
+    # QuickProbeロゴとブランド情報
+    st.markdown("""
+        <div style="text-align: center; margin-bottom: 2rem;">
+            <h2 style="color: #1f77b4; margin-top: 0.5rem;">QuickProbe</h2>
+            <p style="color: #666; font-size: 0.9rem; margin: 0;">仮想インタビューシステム</p>
+        </div>
+    """, unsafe_allow_html=True)
+    
     st.header("📋 ナビゲーション")
     
     # APIキーの設定状況を表示
@@ -193,7 +243,8 @@ with st.sidebar:
     # システム情報
     st.header("ℹ️ システム情報")
     st.info("CPGメーカー向け仮想インタビューシステム")
-    st.caption("Version 2.0.0")
+    st.caption("QuickProbe v2.0.0")
+    st.caption("© 2024 QuickProbe Team")
 
 # ステップ1: 調査要件の収集
 if st.session_state.current_step == 'requirements':
@@ -1272,4 +1323,12 @@ elif st.session_state.current_step == 'summary':
 
 # フッター
 st.divider()
-st.caption("© 2024 仮想インタビューシステム v2.0.0")
+st.markdown("""
+    <div style="text-align: center; padding: 2rem 0;">
+        <div style="margin-bottom: 1rem;">
+            <span style="font-size: 1.2rem; font-weight: bold; color: #1f77b4;">QuickProbe</span>
+        </div>
+        <p style="color: #666; margin: 0;">© 2025 QuickProbe - 仮想インタビューシステム v2.0.0</p>
+        <p style="color: #999; font-size: 0.9rem; margin: 0.5rem 0 0 0;">マーケティング調査の未来を創造する</p>
+    </div>
+""", unsafe_allow_html=True)
