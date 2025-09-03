@@ -66,6 +66,10 @@ if 'fixed_interviews' not in st.session_state:
     st.session_state.fixed_interviews = []
 if 'summary' not in st.session_state:
     st.session_state.summary = None
+if 'clear_input' not in st.session_state:
+    st.session_state.clear_input = False
+if 'input_key' not in st.session_state:
+    st.session_state.input_key = 0
 
 # API設定 - Streamlit Cloud環境では直接処理
 def is_streamlit_cloud():
@@ -496,6 +500,7 @@ elif st.session_state.current_step == 'interview':
                 if st.button("インタビュー開始", type="primary"):
                     st.session_state.current_session = selected_persona_idx
                     st.session_state.chat_messages = []
+                    st.session_state.input_key = 0  # 入力キーをリセット
                     st.success(f"インタビューを開始しました！{st.session_state.personas[selected_persona_idx]['name']}とのチャットが開始されます。")
                     st.rerun()
             else:
@@ -512,8 +517,13 @@ elif st.session_state.current_step == 'interview':
                         else:
                             st.markdown(f'<div class="chat-message assistant-message">🎭 **{selected_persona["name"]}:** {message["content"]}</div>', unsafe_allow_html=True)
                 
+                # 入力フィールドのクリア処理
+                if st.session_state.clear_input:
+                    st.session_state.input_key += 1
+                    st.session_state.clear_input = False
+                
                 # メッセージ入力
-                user_message = st.text_input("メッセージを入力してください", key="chat_input")
+                user_message = st.text_input("メッセージを入力してください", key=f"chat_input_{st.session_state.input_key}")
                 
                 if user_message:
                     # ユーザーメッセージを追加
@@ -612,6 +622,9 @@ elif st.session_state.current_step == 'interview':
                         
                         # 成功メッセージを表示
                         st.success("応答が生成されました！")
+                        
+                        # 入力フィールドをクリアするためにセッション状態にフラグを設定
+                        st.session_state.clear_input = True
                         
                         # チャット履歴を更新
                         st.rerun()
