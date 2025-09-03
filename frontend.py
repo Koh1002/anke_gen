@@ -496,6 +496,7 @@ elif st.session_state.current_step == 'interview':
                 if st.button("インタビュー開始", type="primary"):
                     st.session_state.current_session = selected_persona_idx
                     st.session_state.chat_messages = []
+                    st.success(f"インタビューを開始しました！{st.session_state.personas[selected_persona_idx]['name']}とのチャットが開始されます。")
                     st.rerun()
             else:
                 # チャットインターフェース
@@ -609,7 +610,10 @@ elif st.session_state.current_step == 'interview':
                         # ペルソナの応答を追加
                         st.session_state.chat_messages.append({"role": "assistant", "content": persona_response})
                         
-                        # 画面を更新
+                        # 成功メッセージを表示
+                        st.success("応答が生成されました！")
+                        
+                        # チャット履歴を更新
                         st.rerun()
                 
                 # インタビュー終了
@@ -1047,7 +1051,15 @@ elif st.session_state.current_step == 'summary':
         st.write(f"**総ペルソナ数:** {len(st.session_state.personas)}人")
         
         # 年齢分布
-        ages = [p.get('age', 0) for p in st.session_state.personas if p.get('age')]
+        ages = []
+        for p in st.session_state.personas:
+            try:
+                age = p.get('age')
+                if age and str(age).isdigit():
+                    ages.append(int(age))
+            except (ValueError, TypeError):
+                continue
+        
         if ages:
             st.write(f"**年齢範囲:** {min(ages)}歳 - {max(ages)}歳")
             st.write(f"**平均年齢:** {sum(ages) // len(ages)}歳")
@@ -1055,8 +1067,12 @@ elif st.session_state.current_step == 'summary':
         # 性別分布
         gender_counts = {}
         for p in st.session_state.personas:
-            gender = p.get('gender', '未設定')
-            gender_counts[gender] = gender_counts.get(gender, 0) + 1
+            try:
+                gender = p.get('gender', '未設定')
+                if gender and str(gender).strip():
+                    gender_counts[gender] = gender_counts.get(gender, 0) + 1
+            except (ValueError, TypeError):
+                continue
         
         if gender_counts:
             st.write("**性別分布:**")
@@ -1066,8 +1082,12 @@ elif st.session_state.current_step == 'summary':
         # 職業分布
         occupation_counts = {}
         for p in st.session_state.personas:
-            occupation = p.get('occupation', '未設定')
-            occupation_counts[occupation] = occupation_counts.get(occupation, 0) + 1
+            try:
+                occupation = p.get('occupation', '未設定')
+                if occupation and str(occupation).strip():
+                    occupation_counts[occupation] = occupation_counts.get(occupation, 0) + 1
+            except (ValueError, TypeError):
+                continue
         
         if occupation_counts:
             st.write("**職業分布:**")
@@ -1179,39 +1199,43 @@ elif st.session_state.current_step == 'summary':
                                 raise e
                         
                         # サマリー生成のプロンプト
-                        summary_prompt = f"""
-                        以下の調査結果を分析して、ビジネスに活用できる洞察を含むサマリーレポートを作成してください。
-                        
-                        調査要件:
-                        - 商品カテゴリ: {st.session_state.survey_requirements['product_category']}
-                        - ターゲット年齢層: {st.session_state.survey_requirements['target_age_range']}
-                        - ターゲット性別: {st.session_state.survey_requirements['target_gender']}
-                        - 調査目的: {st.session_state.survey_requirements['survey_purpose']}
-                        - 追加要件: {st.session_state.survey_requirements['additional_requirements']}
-                        
-                        生成されたペルソナ数: {len(st.session_state.personas)}人
-                        
-                        実施された定量調査数: {len(st.session_state.fixed_interviews)}件
-                        
-                        以下の形式でサマリーを作成してください：
-                        
-                        ## 調査概要
-                        [調査の目的と対象の概要]
-                        
-                        ## 主要な発見
-                        [最も重要な発見事項を3-5点]
-                        
-                        ## ターゲット分析
-                        [ペルソナの特徴と傾向]
-                        
-                        ## ビジネス洞察
-                        [商品開発やマーケティングへの示唆]
-                        
-                        ## 今後のアクション
-                        [推奨される次のステップ]
-                        
-                        サマリーは日本語で、実用的で分かりやすい内容にしてください。
-                        """
+                        try:
+                            summary_prompt = f"""
+                            以下の調査結果を分析して、ビジネスに活用できる洞察を含むサマリーレポートを作成してください。
+                            
+                            調査要件:
+                            - 商品カテゴリ: {st.session_state.survey_requirements.get('product_category', '未設定')}
+                            - ターゲット年齢層: {st.session_state.survey_requirements.get('target_age_range', '未設定')}
+                            - ターゲット性別: {st.session_state.survey_requirements.get('target_gender', '未設定')}
+                            - 調査目的: {st.session_state.survey_requirements.get('survey_purpose', '未設定')}
+                            - 追加要件: {st.session_state.survey_requirements.get('additional_requirements', '未設定')}
+                            
+                            生成されたペルソナ数: {len(st.session_state.personas)}人
+                            
+                            実施された定量調査数: {len(st.session_state.fixed_interviews)}件
+                            
+                            以下の形式でサマリーを作成してください：
+                            
+                            ## 調査概要
+                            [調査の目的と対象の概要]
+                            
+                            ## 主要な発見
+                            [最も重要な発見事項を3-5点]
+                            
+                            ## ターゲット分析
+                            [ペルソナの特徴と傾向]
+                            
+                            ## ビジネス洞察
+                            [商品開発やマーケティングへの示唆]
+                            
+                            ## 今後のアクション
+                            [推奨される次のステップ]
+                            
+                            サマリーは日本語で、実用的で分かりやすい内容にしてください。
+                            """
+                        except Exception as e:
+                            st.error(f"サマリープロンプトの生成でエラーが発生しました: {str(e)}")
+                            summary_prompt = "調査結果のサマリーを作成してください。"
                         
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
