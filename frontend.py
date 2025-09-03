@@ -1158,105 +1158,105 @@ elif st.session_state.current_step == 'summary':
     with col2:
         if st.button("AIサマリーを生成", type="primary", use_container_width=True):
             if st.session_state.fixed_interviews or st.session_state.chat_messages:
-            with st.spinner("AIサマリーを生成中..."):
-                # GPT APIキーが設定されている場合はAIで生成
-                api_key = None
-                
-                # Streamlit Cloud環境でのAPIキー取得
-                if is_streamlit_cloud():
-                    try:
-                        import os
-                        if 'OPENAI_API_KEY' in os.environ:
-                            api_key = os.environ['OPENAI_API_KEY']
-                            if not api_key or len(api_key) <= 10:
-                                api_key = None
-                        else:
-                            if hasattr(st, 'secrets') and st.secrets is not None:
-                                if 'OPENAI_API_KEY' in st.secrets:
-                                    api_key = st.secrets['OPENAI_API_KEY']
-                                    if not api_key or len(api_key) <= 10:
-                                        api_key = None
-                    except Exception:
-                        api_key = None
-                
-                # ローカル環境でのAPIキー確認
-                elif not is_streamlit_cloud():
-                    try:
-                        import os
-                        from dotenv import load_dotenv
-                        load_dotenv()
-                        api_key = os.getenv('OPENAI_API_KEY')
-                    except Exception:
-                        api_key = None
-                
-                if api_key:
-                    try:
-                        import openai
-                        
+                with st.spinner("AIサマリーを生成中..."):
+                    # GPT APIキーが設定されている場合はAIで生成
+                    api_key = None
+                    
+                    # Streamlit Cloud環境でのAPIキー取得
+                    if is_streamlit_cloud():
                         try:
-                            client = openai.OpenAI(api_key=api_key)
-                        except TypeError as e:
-                            if "proxies" in str(e):
-                                client = openai.Client(api_key=api_key)
+                            import os
+                            if 'OPENAI_API_KEY' in os.environ:
+                                api_key = os.environ['OPENAI_API_KEY']
+                                if not api_key or len(api_key) <= 10:
+                                    api_key = None
                             else:
-                                raise e
-                        
-                        # サマリー生成のプロンプト
+                                if hasattr(st, 'secrets') and st.secrets is not None:
+                                    if 'OPENAI_API_KEY' in st.secrets:
+                                        api_key = st.secrets['OPENAI_API_KEY']
+                                        if not api_key or len(api_key) <= 10:
+                                            api_key = None
+                        except Exception:
+                            api_key = None
+                    
+                    # ローカル環境でのAPIキー確認
+                    elif not is_streamlit_cloud():
                         try:
-                            summary_prompt = f"""
-                            以下の調査結果を分析して、ビジネスに活用できる洞察を含むサマリーレポートを作成してください。
+                            import os
+                            from dotenv import load_dotenv
+                            load_dotenv()
+                            api_key = os.getenv('OPENAI_API_KEY')
+                        except Exception:
+                            api_key = None
+                    
+                    if api_key:
+                        try:
+                            import openai
                             
-                            調査要件:
-                            - 商品カテゴリ: {st.session_state.survey_requirements.get('product_category', '未設定')}
-                            - ターゲット年齢層: {st.session_state.survey_requirements.get('target_age_range', '未設定')}
-                            - ターゲット性別: {st.session_state.survey_requirements.get('target_gender', '未設定')}
-                            - 調査目的: {st.session_state.survey_requirements.get('survey_purpose', '未設定')}
-                            - 追加要件: {st.session_state.survey_requirements.get('additional_requirements', '未設定')}
+                            try:
+                                client = openai.OpenAI(api_key=api_key)
+                            except TypeError as e:
+                                if "proxies" in str(e):
+                                    client = openai.Client(api_key=api_key)
+                                else:
+                                    raise e
                             
-                            生成されたペルソナ数: {len(st.session_state.personas)}人
+                            # サマリー生成のプロンプト
+                            try:
+                                summary_prompt = f"""
+                                以下の調査結果を分析して、ビジネスに活用できる洞察を含むサマリーレポートを作成してください。
+                                
+                                調査要件:
+                                - 商品カテゴリ: {st.session_state.survey_requirements.get('product_category', '未設定')}
+                                - ターゲット年齢層: {st.session_state.survey_requirements.get('target_age_range', '未設定')}
+                                - ターゲット性別: {st.session_state.survey_requirements.get('target_gender', '未設定')}
+                                - 調査目的: {st.session_state.survey_requirements.get('survey_purpose', '未設定')}
+                                - 追加要件: {st.session_state.survey_requirements.get('additional_requirements', '未設定')}
+                                
+                                生成されたペルソナ数: {len(st.session_state.personas)}人
+                                
+                                実施された定量調査数: {len(st.session_state.fixed_interviews)}件
+                                
+                                以下の形式でサマリーを作成してください：
+                                
+                                ## 調査概要
+                                [調査の目的と対象の概要]
+                                
+                                ## 主要な発見
+                                [最も重要な発見事項を3-5点]
+                                
+                                ## ターゲット分析
+                                [ペルソナの特徴と傾向]
+                                
+                                ## ビジネス洞察
+                                [商品開発やマーケティングへの示唆]
+                                
+                                ## 今後のアクション
+                                [推奨される次のステップ]
+                                
+                                サマリーは日本語で、実用的で分かりやすい内容にしてください。
+                                """
+                            except Exception as e:
+                                st.error(f"サマリープロンプトの生成でエラーが発生しました: {str(e)}")
+                                summary_prompt = "調査結果のサマリーを作成してください。"
                             
-                            実施された定量調査数: {len(st.session_state.fixed_interviews)}件
+                            response = client.chat.completions.create(
+                                model="gpt-4o-mini",
+                                messages=[{"role": "user", "content": summary_prompt}],
+                                max_tokens=1000
+                            )
                             
-                            以下の形式でサマリーを作成してください：
+                            ai_summary = response.choices[0].message.content
+                            st.session_state.summary = ai_summary
                             
-                            ## 調査概要
-                            [調査の目的と対象の概要]
+                            st.success("AIサマリーが生成されました！")
                             
-                            ## 主要な発見
-                            [最も重要な発見事項を3-5点]
-                            
-                            ## ターゲット分析
-                            [ペルソナの特徴と傾向]
-                            
-                            ## ビジネス洞察
-                            [商品開発やマーケティングへの示唆]
-                            
-                            ## 今後のアクション
-                            [推奨される次のステップ]
-                            
-                            サマリーは日本語で、実用的で分かりやすい内容にしてください。
-                            """
                         except Exception as e:
-                            st.error(f"サマリープロンプトの生成でエラーが発生しました: {str(e)}")
-                            summary_prompt = "調査結果のサマリーを作成してください。"
-                        
-                        response = client.chat.completions.create(
-                            model="gpt-4o-mini",
-                            messages=[{"role": "user", "content": summary_prompt}],
-                            max_tokens=1000
-                        )
-                        
-                        ai_summary = response.choices[0].message.content
-                        st.session_state.summary = ai_summary
-                        
-                        st.success("AIサマリーが生成されました！")
-                        
-                    except Exception as e:
-                        st.error(f"AIサマリー生成でエラーが発生しました: {str(e)}")
-                        st.session_state.summary = "AIサマリーの生成に失敗しました。"
-                else:
-                    st.warning("OpenAI APIキーが設定されていないため、AIサマリーを生成できません。")
-                    st.session_state.summary = "APIキーが設定されていないため、AIサマリーを生成できません。"
+                            st.error(f"AIサマリー生成でエラーが発生しました: {str(e)}")
+                            st.session_state.summary = "AIサマリーの生成に失敗しました。"
+                    else:
+                        st.warning("OpenAI APIキーが設定されていないため、AIサマリーを生成できません。")
+                        st.session_state.summary = "APIキーが設定されていないため、AIサマリーを生成できません。"
         
         # サマリーの表示
         if st.session_state.summary:
