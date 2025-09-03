@@ -302,7 +302,6 @@ elif st.session_state.current_step == 'personas':
                     
                     if api_key:
                         try:
-                            st.info("OpenAI APIを使用してペルソナ生成を開始...")
                             import openai
                             
                             # 古いバージョンのOpenAIライブラリとの互換性を確保
@@ -312,7 +311,6 @@ elif st.session_state.current_step == 'personas':
                             except TypeError as e:
                                 if "proxies" in str(e):
                                     # 古いバージョン（0.x系）
-                                    st.warning("古いバージョンのOpenAIライブラリを検出しました。互換性モードで実行します。")
                                     client = openai.Client(api_key=api_key)
                                 else:
                                     raise e
@@ -347,20 +345,14 @@ elif st.session_state.current_step == 'personas':
                             各ペルソナの間に空行を入れてください。年齢、職業、ライフスタイルは多様にしてください。
                             """
                             
-                            st.info("OpenAI APIにリクエストを送信中...")
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
                                 messages=[{"role": "user", "content": prompt}],
                                 max_tokens=2000
                             )
                             
-                            st.success("OpenAI APIからの応答を受信しました！")
-                            
                             # 応答を解析してペルソナを生成
                             ai_response = response.choices[0].message.content
-                            st.info(f"AI応答の長さ: {len(ai_response)}文字")
-                            st.info(f"AI応答の最初の100文字: {ai_response[:100]}...")
-                            
                             personas = []
                             
                             # 応答からペルソナ情報を抽出（簡易的な処理）
@@ -386,8 +378,6 @@ elif st.session_state.current_step == 'personas':
                             if current_persona:
                                 personas.append(current_persona)
                             
-                            st.info(f"解析されたペルソナ数: {len(personas)}")
-                            
                             # 生成されたペルソナが不足している場合はサンプルで補完
                             while len(personas) < persona_count:
                                 i = len(personas)
@@ -408,8 +398,6 @@ elif st.session_state.current_step == 'personas':
                             
                         except Exception as e:
                             st.error(f"AIペルソナ生成でエラーが発生しました: {str(e)}")
-                            st.error(f"エラーの詳細: {type(e).__name__}")
-                            st.error(f"エラーの内容: {str(e)}")
                             # エラーの場合はサンプルペルソナを生成
                             personas = []
                             for i in range(persona_count):
@@ -494,10 +482,10 @@ elif st.session_state.current_step == 'interview':
             # ペルソナ選択
             if not st.session_state.current_session:
                 st.write("インタビューするペルソナを選択してください：")
-                persona_options = [f"{p['name']} ({p['age']}歳, {p['gender']})" for p in st.session_state.personas]
-                selected_persona_idx = st.selectbox("ペルソナを選択", range(len(st.session_state.personas)), format_func=lambda x: persona_options[x])
+                persona_options = ["ペルソナを選択してください"] + [f"{p['name']} ({p['age']}歳, {p['gender']})" for p in st.session_state.personas]
+                selected_persona_idx = st.selectbox("ペルソナを選択", range(-1, len(st.session_state.personas)), format_func=lambda x: persona_options[x+1] if x >= 0 else persona_options[0])
                 
-                if st.button("インタビュー開始", type="primary"):
+                if selected_persona_idx >= 0 and st.button("インタビュー開始", type="primary"):
                     st.session_state.current_session = selected_persona_idx
                     st.session_state.chat_messages = []
                     st.session_state.input_key = 0  # 入力キーをリセット
@@ -1158,15 +1146,17 @@ elif st.session_state.current_step == 'summary':
             selected_persona = st.session_state.personas[st.session_state.current_session]
             st.write(f"**インタビュー対象:** {selected_persona['name']} ({selected_persona['age']}歳, {selected_persona['gender']})")
             
-            st.write("**会話履歴:**")
-            for message in st.session_state.chat_messages:
-                if message['role'] == 'user':
-                    st.markdown(f'<div class="chat-message user-message">👤 **あなた:** {message["content"]}</div>', unsafe_allow_html=True)
-                else:
-                    st.markdown(f'<div class="chat-message assistant-message">🎭 **{selected_persona["name"]}:** {message["content"]}</div>', unsafe_allow_html=True)
+            with st.expander("会話履歴を表示", expanded=False):
+                for message in st.session_state.chat_messages:
+                    if message['role'] == 'user':
+                        st.markdown(f'<div class="chat-message user-message">👤 **あなた:** {message["content"]}</div>', unsafe_allow_html=True)
+                    else:
+                        st.markdown(f'<div class="chat-message assistant-message">🎭 **{selected_persona["name"]}:** {message["content"]}</div>', unsafe_allow_html=True)
     
     # サマリーの生成
-    if st.button("AIサマリーを生成", type="primary"):
+    col1, col2, col3 = st.columns([1, 2, 1])
+    with col2:
+        if st.button("AIサマリーを生成", type="primary", use_container_width=True):
         if st.session_state.fixed_interviews or st.session_state.chat_messages:
             with st.spinner("AIサマリーを生成中..."):
                 # GPT APIキーが設定されている場合はAIで生成
