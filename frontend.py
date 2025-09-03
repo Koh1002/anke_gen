@@ -76,17 +76,14 @@ def is_streamlit_cloud():
         # デバッグ情報
         st.caption(f"環境変数一覧: {list(os.environ.keys())}")
         
+        # 最も確実な判定：OPENAI_API_KEY環境変数の存在確認
+        if 'OPENAI_API_KEY' in os.environ:
+            st.caption("OPENAI_API_KEY環境変数でStreamlit Cloudと判定")
+            return True
+        
         # 環境変数で判定（Streamlit Cloud特有の環境変数）
         if 'STREAMLIT_CLOUD_ENVIRONMENT' in os.environ:
             st.caption("STREAMLIT_CLOUD_ENVIRONMENT環境変数で判定")
-            return True
-        
-        # ホスト名で判定
-        import socket
-        hostname = socket.gethostname()
-        st.caption(f"ホスト名: {hostname}")
-        if 'streamlit' in hostname.lower() or 'cloud' in hostname.lower():
-            st.caption("ホスト名でStreamlit Cloudと判定")
             return True
         
         # より確実な判定：st.secretsの存在確認
@@ -105,6 +102,14 @@ def is_streamlit_cloud():
             except Exception as e:
                 st.caption(f"st.secretsの詳細確認でエラー: {str(e)}")
                 pass
+        
+        # ホスト名で判定（最後の手段）
+        import socket
+        hostname = socket.gethostname()
+        st.caption(f"ホスト名: {hostname}")
+        if 'streamlit' in hostname.lower() or 'cloud' in hostname.lower():
+            st.caption("ホスト名でStreamlit Cloudと判定")
+            return True
         
         st.caption("ローカル環境と判定")
         # ローカル環境と判断
@@ -290,21 +295,36 @@ elif st.session_state.current_step == 'personas':
                     if is_streamlit_cloud():
                         try:
                             st.info("Streamlit Cloud環境でのAPIキー取得を開始...")
-                            if hasattr(st, 'secrets') and st.secrets is not None:
-                                st.info("st.secretsが利用可能です")
-                                if 'OPENAI_API_KEY' in st.secrets:
-                                    api_key = st.secrets['OPENAI_API_KEY']
-                                    if api_key and len(api_key) > 10:  # APIキーの長さチェック
-                                        st.success(f"Streamlit Cloud環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
-                                        st.info(f"APIキーの長さ: {len(api_key)}文字")
-                                    else:
-                                        st.warning("APIキーが空または短すぎます")
-                                        api_key = None
+                            
+                            # まず環境変数から直接取得を試行
+                            import os
+                            if 'OPENAI_API_KEY' in os.environ:
+                                api_key = os.environ['OPENAI_API_KEY']
+                                if api_key and len(api_key) > 10:
+                                    st.success(f"環境変数からAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                    st.info(f"APIキーの長さ: {len(api_key)}文字")
                                 else:
-                                    st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
-                                    st.info(f"利用可能なsecrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else '不明'}")
+                                    st.warning("環境変数のAPIキーが空または短すぎます")
+                                    api_key = None
                             else:
-                                st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                st.info("環境変数にOPENAI_API_KEYが存在しません")
+                                
+                                # 環境変数にない場合はst.secretsから取得を試行
+                                if hasattr(st, 'secrets') and st.secrets is not None:
+                                    st.info("st.secretsが利用可能です")
+                                    if 'OPENAI_API_KEY' in st.secrets:
+                                        api_key = st.secrets['OPENAI_API_KEY']
+                                        if api_key and len(api_key) > 10:
+                                            st.success(f"st.secretsからAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                            st.info(f"APIキーの長さ: {len(api_key)}文字")
+                                        else:
+                                            st.warning("st.secretsのAPIキーが空または短すぎます")
+                                            api_key = None
+                                    else:
+                                        st.warning("st.secretsにOPENAI_API_KEYが設定されていません")
+                                        st.info(f"利用可能なsecrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else '不明'}")
+                                else:
+                                    st.error("Streamlit Cloud環境でst.secretsが利用できません")
                         except Exception as e:
                             st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
                             st.error(f"エラーの詳細: {type(e).__name__}")
