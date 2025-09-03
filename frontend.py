@@ -291,13 +291,32 @@ elif st.session_state.current_step == 'personas':
                     # デバッグ情報
                     st.info(f"環境判定結果: {'Streamlit Cloud' if is_streamlit_cloud() else 'ローカル'}")
                     
+                    # 環境変数の詳細確認
+                    import os
+                    st.info(f"環境変数OPENAI_API_KEYの存在: {'OPENAI_API_KEY' in os.environ}")
+                    if 'OPENAI_API_KEY' in os.environ:
+                        env_api_key = os.environ['OPENAI_API_KEY']
+                        st.info(f"環境変数のAPIキー長: {len(env_api_key) if env_api_key else 0}")
+                        if env_api_key:
+                            st.info(f"環境変数のAPIキー内容: {env_api_key[:4]}...{env_api_key[-4:]}")
+                    
+                    # st.secretsの詳細確認
+                    st.info(f"st.secretsの存在: {hasattr(st, 'secrets') and st.secrets is not None}")
+                    if hasattr(st, 'secrets') and st.secrets is not None:
+                        st.info(f"st.secretsの型: {type(st.secrets)}")
+                        st.info(f"st.secretsの内容: {st.secrets}")
+                        if hasattr(st.secrets, '_secrets'):
+                            st.info(f"st.secrets._secretsの長さ: {len(st.secrets._secrets)}")
+                            st.info(f"st.secrets._secretsの内容: {st.secrets._secrets}")
+                        if hasattr(st.secrets, 'keys'):
+                            st.info(f"st.secrets.keys(): {list(st.secrets.keys())}")
+                    
                     # Streamlit Cloud環境でのAPIキー取得
                     if is_streamlit_cloud():
                         try:
                             st.info("Streamlit Cloud環境でのAPIキー取得を開始...")
                             
                             # まず環境変数から直接取得を試行
-                            import os
                             if 'OPENAI_API_KEY' in os.environ:
                                 api_key = os.environ['OPENAI_API_KEY']
                                 if api_key and len(api_key) > 10:
@@ -342,11 +361,17 @@ elif st.session_state.current_step == 'personas':
                             st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
                     
                     # APIキーの最終確認
+                    st.info("=== APIキー取得の最終確認 ===")
                     if api_key:
                         st.success(f"最終確認: APIキーが設定されています ({api_key[:4]}...{api_key[-4:]})")
+                        st.info(f"APIキーの完全な長さ: {len(api_key)}文字")
+                        st.info(f"APIキーの最初の10文字: {api_key[:10]}")
+                        st.info(f"APIキーの最後の10文字: {api_key[-10:]}")
                     else:
                         st.warning("最終確認: APIキーが設定されていません")
+                        st.error("⚠️ この時点でAPIキーがNoneのため、サンプルペルソナが生成されます")
                     
+                    st.info("=== AI生成処理の開始判定 ===")
                     if api_key:
                         try:
                             st.info("OpenAI APIを使用してペルソナ生成を開始...")
