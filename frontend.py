@@ -70,11 +70,36 @@ if 'summary' not in st.session_state:
 def is_streamlit_cloud():
     """Streamlit Cloud環境かどうかを判定"""
     try:
-        # Streamlit Cloud環境の判定を改善
-        return (hasattr(st, 'secrets') and 
-                hasattr(st.secrets, '_secrets') and 
-                len(st.secrets._secrets) > 0)
+        # Streamlit Cloud環境の判定
+        import os
+        
+        # 環境変数で判定（Streamlit Cloud特有の環境変数）
+        if 'STREAMLIT_CLOUD_ENVIRONMENT' in os.environ:
+            return True
+        
+        # ホスト名で判定
+        import socket
+        hostname = socket.gethostname()
+        if 'streamlit' in hostname.lower() or 'cloud' in hostname.lower():
+            return True
+        
+        # より確実な判定：st.secretsの存在確認
+        if hasattr(st, 'secrets') and st.secrets is not None:
+            # secretsが存在し、かつ何らかの値が設定されている場合はStreamlit Cloudと判断
+            try:
+                # secretsの内容を確認（空でない場合）
+                if hasattr(st.secrets, '_secrets') and len(st.secrets._secrets) > 0:
+                    return True
+                # 直接アクセス可能な場合
+                if hasattr(st.secrets, 'get') and callable(getattr(st.secrets, 'get')):
+                    return True
+            except:
+                pass
+        
+        # ローカル環境と判断
+        return False
     except:
+        # エラーが発生した場合はローカル環境と判断
         return False
 
 # ローカル環境でのみAPIを使用
@@ -113,14 +138,41 @@ with st.sidebar:
     
     # APIキーの設定状況を表示
     st.subheader("🔑 API設定状況")
-    try:
-        if 'OPENAI_API_KEY' in st.secrets:
-            st.success("✅ OpenAI APIキーが設定されています")
-        else:
-            st.warning("⚠️ OpenAI APIキーが設定されていません")
-            st.info("Streamlit Cloudのsecretsで設定してください")
-    except:
+    
+    # デバッグ情報
+    st.caption(f"環境判定: {'Streamlit Cloud' if is_streamlit_cloud() else 'ローカル'}")
+    
+    if is_streamlit_cloud():
+        try:
+            # Streamlit Cloud環境でのAPIキー確認
+            if hasattr(st, 'secrets') and st.secrets is not None:
+                if 'OPENAI_API_KEY' in st.secrets:
+                    st.success("✅ OpenAI APIキーが設定されています")
+                    # APIキーの一部を表示（セキュリティのため最初の4文字のみ）
+                    api_key = st.secrets['OPENAI_API_KEY']
+                    if api_key:
+                        st.caption(f"APIキー: {api_key[:4]}...{api_key[-4:]}")
+                else:
+                    st.warning("⚠️ OpenAI APIキーが設定されていません")
+                    st.info("Streamlit Cloudのsecretsで設定してください")
+            else:
+                st.error("❌ st.secretsが利用できません")
+        except Exception as e:
+            st.warning(f"⚠️ API設定の確認に失敗しました: {str(e)}")
+    else:
         st.info("ℹ️ ローカル環境で実行中")
+        # ローカル環境でのAPIキー確認
+        try:
+            import os
+            from dotenv import load_dotenv
+            load_dotenv()
+            if os.getenv('OPENAI_API_KEY'):
+                st.success("✅ ローカル環境でOpenAI APIキーが設定されています")
+            else:
+                st.warning("⚠️ ローカル環境でOpenAI APIキーが設定されていません")
+                st.info(".envファイルにOPENAI_API_KEYを設定してください")
+        except:
+            st.info("ℹ️ .envファイルの読み込みに失敗しました")
     
     # ステップ表示
     steps = [
@@ -217,10 +269,38 @@ elif st.session_state.current_step == 'personas':
             if st.button("ペルソナを生成", type="primary"):
                 with st.spinner("ペルソナを生成中..."):
                     # GPT APIキーが設定されている場合はAIで生成
-                    if 'OPENAI_API_KEY' in st.secrets:
+                    api_key = None
+                    
+                    # Streamlit Cloud環境でのAPIキー取得
+                    if is_streamlit_cloud():
+                        try:
+                            if hasattr(st, 'secrets') and st.secrets is not None:
+                                if 'OPENAI_API_KEY' in st.secrets:
+                                    api_key = st.secrets['OPENAI_API_KEY']
+                                    st.info(f"Streamlit Cloud環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                else:
+                                    st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                            else:
+                                st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                        except Exception as e:
+                            st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                    
+                    # ローカル環境でのAPIキー確認
+                    elif not is_streamlit_cloud():
+                        try:
+                            import os
+                            from dotenv import load_dotenv
+                            load_dotenv()
+                            api_key = os.getenv('OPENAI_API_KEY')
+                            if api_key:
+                                st.info(f"ローカル環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                        except Exception as e:
+                            st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                    
+                    if api_key:
                         try:
                             import openai
-                            client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                            client = openai.OpenAI(api_key=api_key)
                             
                             # 調査要件に基づいてペルソナを生成
                             prompt = f"""
@@ -324,6 +404,7 @@ elif st.session_state.current_step == 'personas':
                                 })
                     else:
                         # APIキーが設定されていない場合はサンプルペルソナを生成
+                        st.info("OpenAI APIキーが設定されていないため、サンプルペルソナを生成します。")
                         personas = []
                         for i in range(persona_count):
                             personas.append({
@@ -427,13 +508,38 @@ elif st.session_state.current_step == 'interview':
                             "content": user_message
                         })
                         
-                        # Streamlit Cloud環境用の応答生成
+                        # AI応答生成
                         with st.spinner("応答を生成中..."):
-                            # サンプル応答（実際のAPIキーが設定されている場合はAI応答を生成）
-                            if 'OPENAI_API_KEY' in st.secrets:
+                            # APIキーの取得
+                            api_key = None
+                            
+                            # Streamlit Cloud環境でのAPIキー取得
+                            if is_streamlit_cloud():
+                                try:
+                                    if hasattr(st, 'secrets') and st.secrets is not None:
+                                        if 'OPENAI_API_KEY' in st.secrets:
+                                            api_key = st.secrets['OPENAI_API_KEY']
+                                        else:
+                                            st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                                    else:
+                                        st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                except Exception as e:
+                                    st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            # ローカル環境でのAPIキー確認
+                            elif not is_streamlit_cloud():
+                                try:
+                                    import os
+                                    from dotenv import load_dotenv
+                                    load_dotenv()
+                                    api_key = os.getenv('OPENAI_API_KEY')
+                                except Exception as e:
+                                    st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            if api_key:
                                 try:
                                     import openai
-                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    client = openai.OpenAI(api_key=api_key)
                                     response = client.chat.completions.create(
                                         model="gpt-4o-mini",
                                         messages=[
@@ -446,7 +552,7 @@ elif st.session_state.current_step == 'interview':
                                 except Exception as e:
                                     ai_response = f"申し訳ございません。現在、AI応答の生成に問題が発生しています。（エラー: {str(e)}）"
                             else:
-                                ai_response = "OpenAI APIキーが設定されていないため、サンプル応答を表示します。実際のAI応答を利用するには、Streamlit CloudのsecretsでAPIキーを設定してください。"
+                                ai_response = "OpenAI APIキーが設定されていないため、サンプル応答を表示します。実際のAI応答を利用するには、APIキーを設定してください。"
                             
                             # ペルソナの応答を追加
                             st.session_state.chat_messages.append({
@@ -480,10 +586,36 @@ elif st.session_state.current_step == 'interview':
                         survey_results = []
                         
                         for persona in st.session_state.personas:
-                            if 'OPENAI_API_KEY' in st.secrets:
+                            # APIキーの取得
+                            api_key = None
+                            
+                            # Streamlit Cloud環境でのAPIキー取得
+                            if is_streamlit_cloud():
+                                try:
+                                    if hasattr(st, 'secrets') and st.secrets is not None:
+                                        if 'OPENAI_API_KEY' in st.secrets:
+                                            api_key = st.secrets['OPENAI_API_KEY']
+                                        else:
+                                            st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                                    else:
+                                        st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                except Exception as e:
+                                    st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            # ローカル環境でのAPIキー確認
+                            elif not is_streamlit_cloud():
+                                try:
+                                    import os
+                                    from dotenv import load_dotenv
+                                    load_dotenv()
+                                    api_key = os.getenv('OPENAI_API_KEY')
+                                except Exception as e:
+                                    st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            if api_key:
                                 try:
                                     import openai
-                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    client = openai.OpenAI(api_key=api_key)
                                     
                                     prompt = f"""
                                     あなたは{persona['name']}というペルソナです。
@@ -539,10 +671,36 @@ elif st.session_state.current_step == 'interview':
                         survey_results = []
                         
                         for persona in st.session_state.personas:
-                            if 'OPENAI_API_KEY' in st.secrets:
+                            # APIキーの取得
+                            api_key = None
+                            
+                            # Streamlit Cloud環境でのAPIキー取得
+                            if is_streamlit_cloud():
+                                try:
+                                    if hasattr(st, 'secrets') and st.secrets is not None:
+                                        if 'OPENAI_API_KEY' in st.secrets:
+                                            api_key = st.secrets['OPENAI_API_KEY']
+                                        else:
+                                            st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                                    else:
+                                        st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                except Exception as e:
+                                    st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            # ローカル環境でのAPIキー確認
+                            elif not is_streamlit_cloud():
+                                try:
+                                    import os
+                                    from dotenv import load_dotenv
+                                    load_dotenv()
+                                    api_key = os.getenv('OPENAI_API_KEY')
+                                except Exception as e:
+                                    st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            if api_key:
                                 try:
                                     import openai
-                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    client = openai.OpenAI(api_key=api_key)
                                     
                                     prompt = f"""
                                     あなたは{persona['name']}というペルソナです。
@@ -596,10 +754,36 @@ elif st.session_state.current_step == 'interview':
                         survey_results = []
                         
                         for persona in st.session_state.personas:
-                            if 'OPENAI_API_KEY' in st.secrets:
+                            # APIキーの取得
+                            api_key = None
+                            
+                            # Streamlit Cloud環境でのAPIキー取得
+                            if is_streamlit_cloud():
+                                try:
+                                    if hasattr(st, 'secrets') and st.secrets is not None:
+                                        if 'OPENAI_API_KEY' in st.secrets:
+                                            api_key = st.secrets['OPENAI_API_KEY']
+                                        else:
+                                            st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                                    else:
+                                        st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                except Exception as e:
+                                    st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            # ローカル環境でのAPIキー確認
+                            elif not is_streamlit_cloud():
+                                try:
+                                    import os
+                                    from dotenv import load_dotenv
+                                    load_dotenv()
+                                    api_key = os.getenv('OPENAI_API_KEY')
+                                except Exception as e:
+                                    st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                            
+                            if api_key:
                                 try:
                                     import openai
-                                    client = openai.OpenAI(api_key=st.secrets['OPENAI_API_KEY'])
+                                    client = openai.OpenAI(api_key=api_key)
                                     
                                     prompt = f"""
                                     あなたは{persona['name']}というペルソナです。
