@@ -65,6 +65,8 @@ if 'fixed_interviews' not in st.session_state:
     st.session_state.fixed_interviews = []
 if 'summary' not in st.session_state:
     st.session_state.summary = None
+if 'debug_info' not in st.session_state:
+    st.session_state.debug_info = None
 
 # API設定 - Streamlit Cloud環境では直接処理
 def is_streamlit_cloud():
@@ -288,95 +290,182 @@ elif st.session_state.current_step == 'personas':
                     # GPT APIキーが設定されている場合はAIで生成
                     api_key = None
                     
-                    # デバッグ情報
-                    st.markdown("---")
-                    st.markdown("### 🔍 デバッグ情報")
-                    st.info(f"環境判定結果: {'Streamlit Cloud' if is_streamlit_cloud() else 'ローカル'}")
+                    # デバッグ情報を収集
+                    debug_info = {
+                        "environment": "Streamlit Cloud" if is_streamlit_cloud() else "ローカル",
+                        "env_vars": {},
+                        "secrets_info": {},
+                        "api_key_status": {},
+                        "ai_generation_status": {}
+                    }
                     
                     # 環境変数の詳細確認
-                    st.markdown("#### 📋 環境変数の詳細確認")
                     import os
-                    st.info(f"環境変数OPENAI_API_KEYの存在: {'OPENAI_API_KEY' in os.environ}")
-                    if 'OPENAI_API_KEY' in os.environ:
-                        env_api_key = os.environ['OPENAI_API_KEY']
-                        st.info(f"環境変数のAPIキー長: {len(env_api_key) if env_api_key else 0}")
-                        if env_api_key:
-                            st.info(f"環境変数のAPIキー内容: {env_api_key[:4]}...{env_api_key[-4:]}")
+                    debug_info["env_vars"] = {
+                        "OPENAI_API_KEY_exists": 'OPENAI_API_KEY' in os.environ,
+                        "OPENAI_API_KEY_length": len(os.environ.get('OPENAI_API_KEY', '')) if 'OPENAI_API_KEY' in os.environ else 0,
+                        "OPENAI_API_KEY_preview": os.environ.get('OPENAI_API_KEY', '')[:4] + "..." + os.environ.get('OPENAI_API_KEY', '')[-4:] if 'OPENAI_API_KEY' in os.environ and os.environ.get('OPENAI_API_KEY') else "なし"
+                    }
                     
                     # st.secretsの詳細確認
-                    st.markdown("#### 🔐 st.secretsの詳細確認")
-                    st.info(f"st.secretsの存在: {hasattr(st, 'secrets') and st.secrets is not None}")
-                    if hasattr(st, 'secrets') and st.secrets is not None:
-                        st.info(f"st.secretsの型: {type(st.secrets)}")
-                        st.info(f"st.secretsの内容: {st.secrets}")
-                        if hasattr(st.secrets, '_secrets'):
-                            st.info(f"st.secrets._secretsの長さ: {len(st.secrets._secrets)}")
-                            st.info(f"st.secrets._secretsの内容: {st.secrets._secrets}")
-                        if hasattr(st.secrets, 'keys'):
-                            st.info(f"st.secrets.keys(): {list(st.secrets.keys())}")
+                    debug_info["secrets_info"] = {
+                        "exists": hasattr(st, 'secrets') and st.secrets is not None,
+                        "type": str(type(st.secrets)) if hasattr(st, 'secrets') else "なし",
+                        "has_secrets": hasattr(st.secrets, '_secrets') and len(st.secrets._secrets) > 0 if hasattr(st, 'secrets') else False,
+                        "secrets_length": len(st.secrets._secrets) if hasattr(st, 'secrets') and hasattr(st.secrets, '_secrets') else 0,
+                        "available_keys": list(st.secrets.keys()) if hasattr(st, 'secrets') and hasattr(st.secrets, 'keys') else []
+                    }
                     
                     # Streamlit Cloud環境でのAPIキー取得
-                    st.markdown("#### 🚀 APIキー取得処理")
                     if is_streamlit_cloud():
                         try:
-                            st.info("Streamlit Cloud環境でのAPIキー取得を開始...")
-                            
                             # まず環境変数から直接取得を試行
                             if 'OPENAI_API_KEY' in os.environ:
                                 api_key = os.environ['OPENAI_API_KEY']
                                 if api_key and len(api_key) > 10:
-                                    st.success(f"環境変数からAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
-                                    st.info(f"APIキーの長さ: {len(api_key)}文字")
+                                    debug_info["api_key_status"] = {
+                                        "source": "環境変数",
+                                        "status": "成功",
+                                        "length": len(api_key),
+                                        "preview": api_key[:4] + "..." + api_key[-4:]
+                                    }
                                 else:
-                                    st.warning("環境変数のAPIキーが空または短すぎます")
+                                    debug_info["api_key_status"] = {
+                                        "source": "環境変数",
+                                        "status": "失敗",
+                                        "reason": "空または短すぎる",
+                                        "length": len(api_key) if api_key else 0
+                                    }
                                     api_key = None
                             else:
-                                st.info("環境変数にOPENAI_API_KEYが存在しません")
-                                
                                 # 環境変数にない場合はst.secretsから取得を試行
                                 if hasattr(st, 'secrets') and st.secrets is not None:
-                                    st.info("st.secretsが利用可能です")
                                     if 'OPENAI_API_KEY' in st.secrets:
                                         api_key = st.secrets['OPENAI_API_KEY']
                                         if api_key and len(api_key) > 10:
-                                            st.success(f"st.secretsからAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
-                                            st.info(f"APIキーの長さ: {len(api_key)}文字")
+                                            debug_info["api_key_status"] = {
+                                                "source": "st.secrets",
+                                                "status": "成功",
+                                                "length": len(api_key),
+                                                "preview": api_key[:4] + "..." + api_key[-4:]
+                                            }
                                         else:
-                                            st.warning("st.secretsのAPIキーが空または短すぎます")
+                                            debug_info["api_key_status"] = {
+                                                "source": "st.secrets",
+                                                "status": "失敗",
+                                                "reason": "空または短すぎる",
+                                                "length": len(api_key) if api_key else 0
+                                            }
                                             api_key = None
                                     else:
-                                        st.warning("st.secretsにOPENAI_API_KEYが設定されていません")
-                                        st.info(f"利用可能なsecrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else '不明'}")
+                                        debug_info["api_key_status"] = {
+                                            "source": "st.secrets",
+                                            "status": "失敗",
+                                            "reason": "OPENAI_API_KEYが設定されていない",
+                                            "available_keys": list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else []
+                                        }
+                                        api_key = None
                                 else:
-                                    st.error("Streamlit Cloud環境でst.secretsが利用できません")
+                                    debug_info["api_key_status"] = {
+                                        "source": "st.secrets",
+                                        "status": "失敗",
+                                        "reason": "st.secretsが利用できない"
+                                    }
+                                    api_key = None
                         except Exception as e:
-                            st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
-                            st.error(f"エラーの詳細: {type(e).__name__}")
+                            debug_info["api_key_status"] = {
+                                "source": "エラー",
+                                "status": "失敗",
+                                "error": str(e),
+                                "error_type": type(e).__name__
+                            }
+                            api_key = None
                     
                     # ローカル環境でのAPIキー確認
                     elif not is_streamlit_cloud():
                         try:
-                            import os
                             from dotenv import load_dotenv
                             load_dotenv()
                             api_key = os.getenv('OPENAI_API_KEY')
                             if api_key:
-                                st.info(f"ローカル環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                debug_info["api_key_status"] = {
+                                    "source": ".envファイル",
+                                    "status": "成功",
+                                    "length": len(api_key),
+                                    "preview": api_key[:4] + "..." + api_key[-4:]
+                                }
+                            else:
+                                debug_info["api_key_status"] = {
+                                    "source": ".envファイル",
+                                    "status": "失敗",
+                                    "reason": "OPENAI_API_KEYが設定されていない"
+                                }
                         except Exception as e:
-                            st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
+                            debug_info["api_key_status"] = {
+                                "source": ".envファイル",
+                                "status": "失敗",
+                                "error": str(e),
+                                "error_type": type(e).__name__
+                            }
+                            api_key = None
                     
-                    # APIキーの最終確認
-                    st.markdown("#### ✅ APIキー取得の最終確認")
+                    # AI生成処理の状態を記録
                     if api_key:
-                        st.success(f"最終確認: APIキーが設定されています ({api_key[:4]}...{api_key[-4:]})")
-                        st.info(f"APIキーの完全な長さ: {len(api_key)}文字")
-                        st.info(f"APIキーの最初の10文字: {api_key[:10]}")
-                        st.info(f"APIキーの最後の10文字: {api_key[-10:]}")
+                        debug_info["ai_generation_status"] = {
+                            "status": "APIキーあり - AI生成可能",
+                            "api_key_length": len(api_key),
+                            "api_key_preview": api_key[:4] + "..." + api_key[-4:]
+                        }
+                    else:
+                        debug_info["ai_generation_status"] = {
+                            "status": "APIキーなし - サンプル生成",
+                            "reason": "APIキーが設定されていないため"
+                        }
+                    
+                    # デバッグ情報をセッション状態に保存
+                    st.session_state.debug_info = debug_info
+                    
+                    # デバッグ情報を表示
+                    st.markdown("---")
+                    st.markdown("### 🔍 デバッグ情報")
+                    st.info(f"環境判定結果: {debug_info['environment']}")
+                    
+                    # 環境変数の詳細確認
+                    st.markdown("#### 📋 環境変数の詳細確認")
+                    st.info(f"環境変数OPENAI_API_KEYの存在: {debug_info['env_vars']['OPENAI_API_KEY_exists']}")
+                    if debug_info['env_vars']['OPENAI_API_KEY_exists']:
+                        st.info(f"環境変数のAPIキー長: {debug_info['env_vars']['OPENAI_API_KEY_length']}")
+                        if debug_info['env_vars']['OPENAI_API_KEY_preview'] != "なし":
+                            st.info(f"環境変数のAPIキー内容: {debug_info['env_vars']['OPENAI_API_KEY_preview']}")
+                    
+                    # st.secretsの詳細確認
+                    st.markdown("#### 🔐 st.secretsの詳細確認")
+                    st.info(f"st.secretsの存在: {debug_info['secrets_info']['exists']}")
+                    if debug_info['secrets_info']['exists']:
+                        st.info(f"st.secretsの型: {debug_info['secrets_info']['type']}")
+                        st.info(f"st.secrets._secretsの長さ: {debug_info['secrets_info']['secrets_length']}")
+                        if debug_info['secrets_info']['available_keys']:
+                            st.info(f"利用可能なsecrets: {debug_info['secrets_info']['available_keys']}")
+                    
+                    # APIキー取得処理の結果
+                    st.markdown("#### 🚀 APIキー取得処理")
+                    api_status = debug_info['api_key_status']
+                    if api_status['status'] == '成功':
+                        st.success(f"{api_status['source']}からAPIキーを取得しました: {api_status['preview']}")
+                        st.info(f"APIキーの長さ: {api_status['length']}文字")
+                    else:
+                        st.warning(f"{api_status['source']}からのAPIキー取得に失敗: {api_status.get('reason', api_status.get('error', '不明'))}")
+                    
+                    # AI生成処理の状態
+                    st.markdown("#### 🤖 AI生成処理の開始判定")
+                    ai_status = debug_info['ai_generation_status']
+                    if ai_status['status'].startswith('APIキーあり'):
+                        st.success(f"最終確認: APIキーが設定されています ({ai_status['api_key_preview']})")
+                        st.info(f"APIキーの完全な長さ: {ai_status['api_key_length']}文字")
                     else:
                         st.warning("最終確認: APIキーが設定されていません")
-                        st.error("⚠️ この時点でAPIキーがNoneのため、サンプルペルソナが生成されます")
+                        st.error(f"⚠️ {ai_status['reason']}のため、サンプルペルソナが生成されます")
                     
-                    st.markdown("#### 🤖 AI生成処理の開始判定")
                     if api_key:
                         try:
                             st.info("OpenAI APIを使用してペルソナ生成を開始...")
@@ -516,14 +605,54 @@ elif st.session_state.current_step == 'personas':
                     st.session_state.personas = personas
                     st.success(f"{len(personas)}人のペルソナが生成されました！")
                     
-                    # デバッグ情報を確認できるように、画面遷移を遅延
-                    st.info("⚠️ デバッグ情報を確認するために、5秒後に画面を更新します...")
-                    import time
-                    time.sleep(5)
-                    st.rerun()
+                    # デバッグ情報を永続的に表示
+                    st.info("✅ デバッグ情報が表示されています。画面遷移後も確認できます。")
     
     # 生成されたペルソナの表示
     if st.session_state.personas:
+        # デバッグ情報の表示（セッション状態に保存されている場合）
+        if st.session_state.debug_info:
+            with st.expander("🔍 デバッグ情報を表示", expanded=False):
+                debug_info = st.session_state.debug_info
+                st.markdown("### 🔍 デバッグ情報")
+                st.info(f"環境判定結果: {debug_info['environment']}")
+                
+                # 環境変数の詳細確認
+                st.markdown("#### 📋 環境変数の詳細確認")
+                st.info(f"環境変数OPENAI_API_KEYの存在: {debug_info['env_vars']['OPENAI_API_KEY_exists']}")
+                if debug_info['env_vars']['OPENAI_API_KEY_exists']:
+                    st.info(f"環境変数のAPIキー長: {debug_info['env_vars']['OPENAI_API_KEY_length']}")
+                    if debug_info['env_vars']['OPENAI_API_KEY_preview'] != "なし":
+                        st.info(f"環境変数のAPIキー内容: {debug_info['env_vars']['OPENAI_API_KEY_preview']}")
+                
+                # st.secretsの詳細確認
+                st.markdown("#### 🔐 st.secretsの詳細確認")
+                st.info(f"st.secretsの存在: {debug_info['secrets_info']['exists']}")
+                if debug_info['secrets_info']['exists']:
+                    st.info(f"st.secretsの型: {debug_info['secrets_info']['type']}")
+                    st.info(f"st.secrets._secretsの長さ: {debug_info['secrets_info']['secrets_length']}")
+                    if debug_info['secrets_info']['available_keys']:
+                        st.info(f"利用可能なsecrets: {debug_info['secrets_info']['available_keys']}")
+                
+                # APIキー取得処理の結果
+                st.markdown("#### 🚀 APIキー取得処理")
+                api_status = debug_info['api_key_status']
+                if api_status['status'] == '成功':
+                    st.success(f"{api_status['source']}からAPIキーを取得しました: {api_status['preview']}")
+                    st.info(f"APIキーの長さ: {api_status['length']}文字")
+                else:
+                    st.warning(f"{api_status['source']}からのAPIキー取得に失敗: {api_status.get('reason', api_status.get('error', '不明'))}")
+                
+                # AI生成処理の状態
+                st.markdown("#### 🤖 AI生成処理の開始判定")
+                ai_status = debug_info['ai_generation_status']
+                if ai_status['status'].startswith('APIキーあり'):
+                    st.success(f"最終確認: APIキーが設定されています ({ai_status['api_key_preview']})")
+                    st.info(f"APIキーの完全な長さ: {ai_status['api_key_length']}文字")
+                else:
+                    st.warning("最終確認: APIキーが設定されていません")
+                    st.error(f"⚠️ {ai_status['reason']}のため、サンプルペルソナが生成されます")
+        
         st.subheader("👥 生成されたペルソナ")
         
         for i, persona in enumerate(st.session_state.personas):
