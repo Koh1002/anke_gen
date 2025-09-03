@@ -1157,7 +1157,7 @@ elif st.session_state.current_step == 'summary':
     col1, col2, col3 = st.columns([1, 2, 1])
     with col2:
         if st.button("AIサマリーを生成", type="primary", use_container_width=True):
-        if st.session_state.fixed_interviews or st.session_state.chat_messages:
+            if st.session_state.fixed_interviews or st.session_state.chat_messages:
             with st.spinner("AIサマリーを生成中..."):
                 # GPT APIキーが設定されている場合はAIで生成
                 api_key = None
