@@ -289,9 +289,12 @@ elif st.session_state.current_step == 'personas':
                     api_key = None
                     
                     # デバッグ情報
+                    st.markdown("---")
+                    st.markdown("### 🔍 デバッグ情報")
                     st.info(f"環境判定結果: {'Streamlit Cloud' if is_streamlit_cloud() else 'ローカル'}")
                     
                     # 環境変数の詳細確認
+                    st.markdown("#### 📋 環境変数の詳細確認")
                     import os
                     st.info(f"環境変数OPENAI_API_KEYの存在: {'OPENAI_API_KEY' in os.environ}")
                     if 'OPENAI_API_KEY' in os.environ:
@@ -301,6 +304,7 @@ elif st.session_state.current_step == 'personas':
                             st.info(f"環境変数のAPIキー内容: {env_api_key[:4]}...{env_api_key[-4:]}")
                     
                     # st.secretsの詳細確認
+                    st.markdown("#### 🔐 st.secretsの詳細確認")
                     st.info(f"st.secretsの存在: {hasattr(st, 'secrets') and st.secrets is not None}")
                     if hasattr(st, 'secrets') and st.secrets is not None:
                         st.info(f"st.secretsの型: {type(st.secrets)}")
@@ -312,6 +316,7 @@ elif st.session_state.current_step == 'personas':
                             st.info(f"st.secrets.keys(): {list(st.secrets.keys())}")
                     
                     # Streamlit Cloud環境でのAPIキー取得
+                    st.markdown("#### 🚀 APIキー取得処理")
                     if is_streamlit_cloud():
                         try:
                             st.info("Streamlit Cloud環境でのAPIキー取得を開始...")
@@ -361,7 +366,7 @@ elif st.session_state.current_step == 'personas':
                             st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
                     
                     # APIキーの最終確認
-                    st.info("=== APIキー取得の最終確認 ===")
+                    st.markdown("#### ✅ APIキー取得の最終確認")
                     if api_key:
                         st.success(f"最終確認: APIキーが設定されています ({api_key[:4]}...{api_key[-4:]})")
                         st.info(f"APIキーの完全な長さ: {len(api_key)}文字")
@@ -371,7 +376,7 @@ elif st.session_state.current_step == 'personas':
                         st.warning("最終確認: APIキーが設定されていません")
                         st.error("⚠️ この時点でAPIキーがNoneのため、サンプルペルソナが生成されます")
                     
-                    st.info("=== AI生成処理の開始判定 ===")
+                    st.markdown("#### 🤖 AI生成処理の開始判定")
                     if api_key:
                         try:
                             st.info("OpenAI APIを使用してペルソナ生成を開始...")
@@ -510,6 +515,11 @@ elif st.session_state.current_step == 'personas':
                     
                     st.session_state.personas = personas
                     st.success(f"{len(personas)}人のペルソナが生成されました！")
+                    
+                    # デバッグ情報を確認できるように、画面遷移を遅延
+                    st.info("⚠️ デバッグ情報を確認するために、5秒後に画面を更新します...")
+                    import time
+                    time.sleep(5)
                     st.rerun()
     
     # 生成されたペルソナの表示
