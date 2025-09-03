@@ -73,32 +73,44 @@ def is_streamlit_cloud():
         # Streamlit Cloud環境の判定
         import os
         
+        # デバッグ情報
+        st.caption(f"環境変数一覧: {list(os.environ.keys())}")
+        
         # 環境変数で判定（Streamlit Cloud特有の環境変数）
         if 'STREAMLIT_CLOUD_ENVIRONMENT' in os.environ:
+            st.caption("STREAMLIT_CLOUD_ENVIRONMENT環境変数で判定")
             return True
         
         # ホスト名で判定
         import socket
         hostname = socket.gethostname()
+        st.caption(f"ホスト名: {hostname}")
         if 'streamlit' in hostname.lower() or 'cloud' in hostname.lower():
+            st.caption("ホスト名でStreamlit Cloudと判定")
             return True
         
         # より確実な判定：st.secretsの存在確認
         if hasattr(st, 'secrets') and st.secrets is not None:
+            st.caption("st.secretsが存在します")
             # secretsが存在し、かつ何らかの値が設定されている場合はStreamlit Cloudと判断
             try:
                 # secretsの内容を確認（空でない場合）
                 if hasattr(st.secrets, '_secrets') and len(st.secrets._secrets) > 0:
+                    st.caption(f"st.secrets._secretsの長さ: {len(st.secrets._secrets)}")
                     return True
                 # 直接アクセス可能な場合
                 if hasattr(st.secrets, 'get') and callable(getattr(st.secrets, 'get')):
+                    st.caption("st.secrets.getメソッドが利用可能")
                     return True
-            except:
+            except Exception as e:
+                st.caption(f"st.secretsの詳細確認でエラー: {str(e)}")
                 pass
         
+        st.caption("ローカル環境と判定")
         # ローカル環境と判断
         return False
-    except:
+    except Exception as e:
+        st.caption(f"環境判定でエラー: {str(e)}")
         # エラーが発生した場合はローカル環境と判断
         return False
 
@@ -271,19 +283,31 @@ elif st.session_state.current_step == 'personas':
                     # GPT APIキーが設定されている場合はAIで生成
                     api_key = None
                     
+                    # デバッグ情報
+                    st.info(f"環境判定結果: {'Streamlit Cloud' if is_streamlit_cloud() else 'ローカル'}")
+                    
                     # Streamlit Cloud環境でのAPIキー取得
                     if is_streamlit_cloud():
                         try:
+                            st.info("Streamlit Cloud環境でのAPIキー取得を開始...")
                             if hasattr(st, 'secrets') and st.secrets is not None:
+                                st.info("st.secretsが利用可能です")
                                 if 'OPENAI_API_KEY' in st.secrets:
                                     api_key = st.secrets['OPENAI_API_KEY']
-                                    st.info(f"Streamlit Cloud環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                    if api_key and len(api_key) > 10:  # APIキーの長さチェック
+                                        st.success(f"Streamlit Cloud環境でAPIキーを取得しました: {api_key[:4]}...{api_key[-4:]}")
+                                        st.info(f"APIキーの長さ: {len(api_key)}文字")
+                                    else:
+                                        st.warning("APIキーが空または短すぎます")
+                                        api_key = None
                                 else:
                                     st.warning("Streamlit Cloud環境でOpenAI APIキーが設定されていません")
+                                    st.info(f"利用可能なsecrets: {list(st.secrets.keys()) if hasattr(st.secrets, 'keys') else '不明'}")
                             else:
                                 st.error("Streamlit Cloud環境でst.secretsが利用できません")
                         except Exception as e:
                             st.error(f"Streamlit Cloud環境でのAPIキー取得に失敗: {str(e)}")
+                            st.error(f"エラーの詳細: {type(e).__name__}")
                     
                     # ローカル環境でのAPIキー確認
                     elif not is_streamlit_cloud():
@@ -297,8 +321,15 @@ elif st.session_state.current_step == 'personas':
                         except Exception as e:
                             st.error(f"ローカル環境でのAPIキー取得に失敗: {str(e)}")
                     
+                    # APIキーの最終確認
+                    if api_key:
+                        st.success(f"最終確認: APIキーが設定されています ({api_key[:4]}...{api_key[-4:]})")
+                    else:
+                        st.warning("最終確認: APIキーが設定されていません")
+                    
                     if api_key:
                         try:
+                            st.info("OpenAI APIを使用してペルソナ生成を開始...")
                             import openai
                             client = openai.OpenAI(api_key=api_key)
                             
@@ -332,14 +363,20 @@ elif st.session_state.current_step == 'personas':
                             各ペルソナの間に空行を入れてください。年齢、職業、ライフスタイルは多様にしてください。
                             """
                             
+                            st.info("OpenAI APIにリクエストを送信中...")
                             response = client.chat.completions.create(
                                 model="gpt-4o-mini",
                                 messages=[{"role": "user", "content": prompt}],
                                 max_tokens=2000
                             )
                             
+                            st.success("OpenAI APIからの応答を受信しました！")
+                            
                             # 応答を解析してペルソナを生成
                             ai_response = response.choices[0].message.content
+                            st.info(f"AI応答の長さ: {len(ai_response)}文字")
+                            st.info(f"AI応答の最初の100文字: {ai_response[:100]}...")
+                            
                             personas = []
                             
                             # 応答からペルソナ情報を抽出（簡易的な処理）
@@ -365,6 +402,8 @@ elif st.session_state.current_step == 'personas':
                             if current_persona:
                                 personas.append(current_persona)
                             
+                            st.info(f"解析されたペルソナ数: {len(personas)}")
+                            
                             # 生成されたペルソナが不足している場合はサンプルで補完
                             while len(personas) < persona_count:
                                 i = len(personas)
@@ -385,6 +424,8 @@ elif st.session_state.current_step == 'personas':
                             
                         except Exception as e:
                             st.error(f"AIペルソナ生成でエラーが発生しました: {str(e)}")
+                            st.error(f"エラーの詳細: {type(e).__name__}")
+                            st.error(f"エラーの内容: {str(e)}")
                             # エラーの場合はサンプルペルソナを生成
                             personas = []
                             for i in range(persona_count):
